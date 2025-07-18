@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Site Tracker</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 0; }
+    .carousel { display: flex; overflow-x: auto; padding: 10px; background: #f2f2f2; white-space: nowrap; }
+    .carousel div { min-width: 50px; margin: 0 5px; padding: 8px; border: 2px solid #ccc; border-radius: 5px; text-align: center; }
+    .carousel .current { border-color: #007bff; background: #e7f0ff; font-weight: bold; }
+    .status-btns { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; padding: 10px; }
+    .status-btns button.active { background: #007bff; color: white; }
+    .comment-box { padding: 10px; }
+    .controls { display: flex; justify-content: space-between; padding: 10px; }
+    .range-input { padding: 10px; }
+    .range-input input { width: 60px; margin-right: 5px; }
+  </style>
+</head>
+<body>
+  <div class="range-input">
+    <input type="number" id="rangeStart" placeholder="Start"> -
+    <input type="number" id="rangeEnd" placeholder="End">
+    <button onclick="addRange()">Add Range</button>
+    <div id="rangeList"></div>
+  </div>
+
+  <div class="carousel" id="numberCarousel"></div>
+
+  <div class="status-btns">
+    <button onclick="toggleStatus('locked')">Locked</button>
+    <button onclick="toggleStatus('empty')">Empty</button>
+    <button onclick="toggleStatus('overlocked')">Overlocked</button>
+    <button onclick="toggleStatus('issue')">Issue</button>
+  </div>
+
+  <div class="comment-box">
+    <input type="text" id="commentInput" placeholder="Add comment..." oninput="updateComment()" />
+  </div>
+
+  <div class="controls">
+    <button onclick="prevNumber()">Previous</button>
+    <button onclick="nextNumber()">Next</button>
+  </div>
+
+  <script>
+    let ranges = [];
+    let numbers = [];
+    let currentIndex = 0;
+    let statusData = {};
+    let commentData = {};
+
+    function addRange() {
+      const start = parseInt(document.getElementById('rangeStart').value);
+      const end = parseInt(document.getElementById('rangeEnd').value);
+      if (!isNaN(start) && !isNaN(end) && start <= end) {
+        ranges.push([start, end]);
+        document.getElementById('rangeStart').value = '';
+        document.getElementById('rangeEnd').value = '';
+        updateRangeList();
+        buildNumberList();
+      }
+    }
+
+    function updateRangeList() {
+      const list = document.getElementById('rangeList');
+      list.innerHTML = ranges.map(r => `<span>${r[0]}–${r[1]}</span>`).join(', ');
+    }
+
+    function buildNumberList() {
+      numbers = [];
+      ranges.forEach(([start, end]) => {
+        for (let i = start; i <= end; i++) numbers.push(i);
+      });
+      renderCarousel();
+      currentIndex = 0;
+      loadState();
+    }
+
+    function renderCarousel() {
+      const container = document.getElementById('numberCarousel');
+      container.innerHTML = '';
+      numbers.forEach((n, i) => {
+        const box = document.createElement('div');
+        box.textContent = n;
+        box.className = i === currentIndex ? 'current' : '';
+        container.appendChild(box);
+      });
+    }
+
+    function toggleStatus(status) {
+      const num = numbers[currentIndex];
+      if (!statusData[num]) statusData[num] = {};
+      statusData[num][status] = !statusData[num][status];
+      saveState();
+    }
+
+    function updateComment() {
+      const num = numbers[currentIndex];
+      commentData[num] = document.getElementById('commentInput').value;
+      saveState();
+    }
+
+    function prevNumber() {
+      if (currentIndex > 0) currentIndex--;
+      loadState();
+    }
+
+    function nextNumber() {
+      if (currentIndex < numbers.length - 1) currentIndex++;
+      loadState();
+    }
+
+    function loadState() {
+      renderCarousel();
+      const num = numbers[currentIndex];
+      const stat = statusData[num] || {};
+      document.querySelectorAll('.status-btns button').forEach(btn => {
+        btn.classList.toggle('active', stat[btn.textContent.toLowerCase()]);
+      });
+      document.getElementById('commentInput').value = commentData[num] || '';
+    }
+
+    function saveState() {
+      localStorage.setItem('tracker_status', JSON.stringify(statusData));
+      localStorage.setItem('tracker_comment', JSON.stringify(commentData));
+    }
+
+    window.addEventListener('load', () => {
+      const storedStatus = localStorage.getItem('tracker_status');
+      const storedComment = localStorage.getItem('tracker_comment');
+      if (storedStatus) statusData = JSON.parse(storedStatus);
+      if (storedComment) commentData = JSON.parse(storedComment);
+    });
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js');
+    }
+  </script>
+</body>
+</html>
