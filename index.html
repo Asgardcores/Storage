@@ -152,13 +152,12 @@
       min-height: 1em;
     }
     
-
 .redundant-unit-box {
+  position: absolute;
+  top: calc(100px + 210px); /* Adjust based on your layout spacing */
+  right: 10px;
   width: 60px;
   height: 60px;
-  margin-left: auto;
-  margin-top: 5px;
-  margin-bottom: 10px;
   border: 2px solid black;
   border-radius: 6px;
   font-weight: bold;
@@ -167,6 +166,7 @@
   justify-content: center;
   background: white;
   box-shadow: inset 2px 2px 5px #999;
+  z-index: 5;
 }
     .nav-buttons {
       display: flex;
@@ -311,7 +311,8 @@
     </div>
     <textarea class="comment-box" placeholder="Comment..." onblur="saveData()"></textarea>
     <div class="last-modified" id="lastModified">Last updated: —</div>
-        <div class="redundant-unit-box" id="redundantUnitBox">—</div>
+            <div class="redundant-unit-box" id="redundantUnitBox">—</div>
+
 
 <button onclick="openHistory()" class="toggle-btn" style="margin-bottom: 10px;">View History</button>
 
