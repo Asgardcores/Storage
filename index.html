@@ -154,8 +154,9 @@
     
 .redundant-unit-box {
   position: absolute;
-  top: calc(100px + 210px); /* Adjust based on your layout spacing */
+  top: 100%; /* just below the View History button */
   right: 10px;
+  margin-top: 5px;
   width: 60px;
   height: 60px;
   border: 2px solid black;
@@ -166,7 +167,7 @@
   justify-content: center;
   background: white;
   box-shadow: inset 2px 2px 5px #999;
-  z-index: 5;
+  z-index: 10;
 }
     .nav-buttons {
       display: flex;
@@ -315,7 +316,8 @@
 
 
 <button onclick="openHistory()" class="toggle-btn" style="margin-bottom: 10px;">View History</button>
-
+<div class="redundant-unit-box" id="redundantUnitBox">—</div>
+<button onclick="openHistory()" class="toggle-btn" style="margin-bottom: 10px;">View History</button>
     <div class="nav-buttons">
       <button onclick="previousUnit()">◀ Previous</button>
       <button onclick="nextUnit()">Next ▶</button>
