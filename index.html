@@ -151,7 +151,24 @@
       margin-bottom: 10px;
       min-height: 1em;
     }
+    
+    <div class="redundant-unit-box" id="redundantUnitBox">—</div>
 
+.redundant-unit-box {
+  width: 60px;
+  height: 60px;
+  margin-left: auto;
+  margin-top: 5px;
+  margin-bottom: 10px;
+  border: 2px solid black;
+  border-radius: 6px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  box-shadow: inset 2px 2px 5px #999;
+}
     .nav-buttons {
       display: flex;
       width: 100%;
@@ -537,7 +554,7 @@ function selectUnit(n) {
   });
   document.querySelector(".comment-box").value = data.comment || "";
   document.getElementById("lastModified").textContent = `Last updated: ${data.modified ? formatUSDate(data.modified) : "—"}`;
- 
+ document.getElementById("redundantUnitBox").textContent = n;
 }
 
 function getKey(n) {
