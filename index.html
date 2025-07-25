@@ -1,142 +1,735 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Site Tracker</title>
-  <link rel="manifest" href="manifest.json">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Self Storage Tracker</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Self Storage Tracker">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
   <style>
-    body { font-family: sans-serif; margin: 0; padding: 0; }
-    .carousel { display: flex; overflow-x: auto; padding: 10px; background: #f2f2f2; white-space: nowrap; }
-    .carousel div { min-width: 50px; margin: 0 5px; padding: 8px; border: 2px solid #ccc; border-radius: 5px; text-align: center; }
-    .carousel .current { border-color: #007bff; background: #e7f0ff; font-weight: bold; }
-    .status-btns { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; padding: 10px; }
-    .status-btns button.active { background: #007bff; color: white; }
-    .comment-box { padding: 10px; }
-    .controls { display: flex; justify-content: space-between; padding: 10px; }
-    .range-input { padding: 10px; }
-    .range-input input { width: 60px; margin-right: 5px; }
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, sans-serif;
+      background: #f0f0f0;
+      touch-action: manipulation;
+      overscroll-behavior: none;
+      height: 100%;
+      font-size: 18px;
+    }
+
+    .top-bar {
+      background: steelblue;
+      color: white;
+      text-align: center;
+      padding: 1em;
+      font-weight: bold;
+      font-size: 1.2em;
+    }
+
+    .status-tracker {
+      display: flex;
+      justify-content: space-around;
+      background: #e6e6e6;
+      padding: 8px;
+      font-size: 0.9em;
+      font-weight: bold;
+    }
+
+    .carousel {
+      display: flex;
+      overflow-x: auto;
+      padding: 10px;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      background: #f9f9f9;
+    }
+
+    .carousel::-webkit-scrollbar {
+      display: none;
+    }
+
+    .unit-box {
+      min-width: 60px;
+      height: 60px;
+      margin: 5px;
+      border: 2px solid black;
+      scroll-snap-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      border-radius: 6px;
+      position: relative;
+      user-select: none;
+      flex-shrink: 0;
+      background: white;
+      box-shadow: inset 2px 2px 5px #999;
+    }
+
+    .unit-box.active {
+      border: 3px solid dodgerblue;
+    }
+
+    .unit-icon {
+  position: absolute;
+  font-weight: bold;
+  font-size: 0.9em;
+  color: black;
+  pointer-events: none;
+}
+.unit-icon.comment { bottom: 2px; left: 6px; content: "*"; }
+.unit-icon.multi   { top: 4px; right: 6px; content: "†"; }
+.unit-icon.modified {
+  top: 4px; left: 4px;
+  width: 8px; height: 8px;
+  background: blue;
+  border-radius: 50%;
+}
+
+    .main {
+      padding: 10px;
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 10px 0;
+    }
+
+    .status-btn {
+      padding: 20px;
+      background: steelblue;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      box-shadow: 2px 2px 6px #555;
+      font-weight: bold;
+      font-size: 1em;
+      transition: all 0.2s ease;
+    }
+
+    .status-btn.active {
+      background: #ccc;
+      color: #333;
+      box-shadow: inset 2px 2px 6px #999;
+    }
+
+.big-close-btn {
+  padding: 1.2em;
+  font-size: 1.1em;
+  font-weight: bold;
+  background: steelblue;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  width: 100%;
+}
+
+    .comment-box {
+      width: 100%;
+      padding: 10px;
+      font-size: 1em;
+      margin-bottom: 5px;
+      border-radius: 6px;
+      border: 1px solid #aaa;
+    }
+
+    .last-modified {
+      font-size: 0.8em;
+      color: #555;
+      margin-bottom: 10px;
+      min-height: 1em;
+    }
+
+    .nav-buttons {
+      display: flex;
+      width: 100%;
+      gap: 10px;
+    }
+
+    .nav-buttons button {
+      flex: 1;
+      padding: 20px;
+      font-size: 1em;
+      font-weight: bold;
+      border: none;
+      border-radius: 0;
+      background: steelblue;
+      color: white;
+    }
+
+    .menu-screen, .report-screen {
+      position: fixed;
+      inset: 0;
+      background: white;
+      z-index: 10;
+      padding: 1em;
+      display: none;
+      flex-direction: column;
+      gap: 1em;
+      overflow-y: auto;
+    }
+
+    .menu-screen input, .menu-screen select, .menu-screen textarea,
+    .report-screen input {
+      font-size: 1em;
+      padding: 0.5em;
+      width: 100%;
+    }
+
+    .menu-screen button, .report-screen button {
+      padding: 1em;
+      font-size: 1em;
+      font-weight: bold;
+      background: steelblue;
+      color: white;
+      border: none;
+      border-radius: 6px;
+    }
+
+    .range-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #eee;
+      padding: 0.5em;
+      margin-bottom: 0.5em;
+      border-radius: 6px;
+    }
+
+    .range-controls button {
+      margin-left: 0.5em;
+    }
+
+    .report-output {
+      white-space: pre-wrap;
+      font-family: monospace;
+      background: #eee;
+      padding: 10px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .toggle-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 0.9em;
+    }
+
+    .toggle-btn {
+      padding: 8px 14px;
+      background: steelblue;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      box-shadow: 2px 2px 6px #555;
+      font-weight: bold;
+      font-size: 0.9em;
+      cursor: pointer;
+    }
+
+    .toggle-btn.active {
+      background: #ccc;
+      color: #333;
+      box-shadow: inset 2px 2px 6px #999;
+    }
+
+.save-glow {
+  animation: glow 0.5s ease-out;
+}
+@keyframes glow {
+  0% { box-shadow: 0 0 0 3px deepskyblue; }
+  100% { box-shadow: inset 2px 2px 5px #999; }
+}
+
+.history-log {
+  font-size: 0.85em;
+  background: #f7f7f7;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  margin-top: 8px;
+  white-space: pre-line;
+}
+.history-screen {
+  position: fixed;
+  inset: 0;
+  background: white;
+  z-index: 10;
+  padding: 1em;
+  display: none;
+  flex-direction: column;
+  gap: 1em;
+  overflow-y: auto;
+}
   </style>
 </head>
 <body>
-  <div class="range-input">
-    <input type="number" id="rangeStart" placeholder="Start"> -
-    <input type="number" id="rangeEnd" placeholder="End">
-    <button onclick="addRange()">Add Range</button>
+  <div class="top-bar" onclick="openMenu()">☰ Menu</div>
+
+<div id="offlineReadyBanner" style="display:none; text-align:center; background:#4CAF50; color:white; padding:10px; font-weight:bold;">
+  ✓ App is ready to use offline
+</div>
+
+  <div class="status-tracker" id="statusTracker">Loading tracker...</div>
+  <div class="carousel" id="carousel"></div>
+
+  <div class="main">
+    <div class="status-grid">
+      <button class="status-btn" onclick="toggleStatus('locked')">Locked</button>
+      <button class="status-btn" onclick="toggleStatus('vacant')">Vacant</button>
+      <button class="status-btn" onclick="toggleStatus('overlocked')">Overlocked</button>
+      <button class="status-btn" onclick="toggleStatus('issue')">Issue</button>
+    </div>
+    <textarea class="comment-box" placeholder="Comment..." oninput="saveData()"></textarea>
+    <div class="last-modified" id="lastModified">Last updated: —</div>
+<button onclick="openHistory()" class="toggle-btn" style="margin-bottom: 10px;">View History</button>
+
+    <div class="nav-buttons">
+      <button onclick="previousUnit()">◀ Previous</button>
+      <button onclick="nextUnit()">Next ▶</button>
+    </div>
+  </div>
+
+  <div class="menu-screen" id="menuScreen">
+    <label>Date:
+      <input type="date" id="datePicker" onchange="changeDate(this.value)">
+    </label>
+
+    <label>Add Range (e.g. 1-20):
+      <input type="text" id="rangeInput">
+      <button onclick="addRange()">Add Range</button>
+    </label>
+
     <div id="rangeList"></div>
+
+    <button onclick="openReport()">Generate Report</button>
+    <button onclick="closeMenu()">Close Menu</button>
+  </div>
+<button onclick="forceOfflineSetup()" class="toggle-btn">Download for Offline Use</button>
+  <div class="report-screen" id="reportScreen">
+    <h3>Report Filters</h3>
+    <div class="toggle-row" id="filterToggles"></div>
+    <div style="margin-top: 0.5em;">
+      <button class="toggle-btn" id="toggleComment" onclick="toggleCommentFilter()">Only With Comments</button>
+
+
+<button class="toggle-btn" id="toggleModifiedToday" onclick="toggleModifiedTodayFilter()">Only Modified Today</button>
+    </div>
+
+
+    <div class="report-output" id="reportOutput"></div>
+    <button onclick="closeReport()">Close Report</button>
   </div>
 
-  <div class="carousel" id="numberCarousel"></div>
+<div class="history-screen" id="historyScreen">
+  <h3>History for Unit <span id="historyUnit"></span></h3>
+  <div class="report-output" id="historyOutput">Loading...</div>
+  <button class="big-close-btn" onclick="closeHistory()">Close</button>
+</div>    
 
-  <div class="status-btns">
-    <button onclick="toggleStatus('locked')">Locked</button>
-    <button onclick="toggleStatus('empty')">Empty</button>
-    <button onclick="toggleStatus('overlocked')">Overlocked</button>
-    <button onclick="toggleStatus('issue')">Issue</button>
-  </div>
+<script>
+let ranges = JSON.parse(localStorage.getItem("ranges") || "[]");
+let selectedDate = new Date().toISOString().split('T')[0];
+let currentUnit = null;
+const statuses = ["locked", "vacant", "overlocked", "issue"];
+let reportFilters = { locked: true, vacant: true, overlocked: true, issue: true };
+let filterCommentsOnly = false;
+let filterModifiedToday = false;
 
-  <div class="comment-box">
-    <input type="text" id="commentInput" placeholder="Add comment..." oninput="updateComment()" />
-  </div>
+document.getElementById("datePicker").value = selectedDate;
 
-  <div class="controls">
-    <button onclick="prevNumber()">Previous</button>
-    <button onclick="nextNumber()">Next</button>
-  </div>
+function openMenu() {
+  document.getElementById("menuScreen").style.display = "flex";
+  renderRangeList();
+}
 
-  <script>
-    let ranges = [];
-    let numbers = [];
-    let currentIndex = 0;
-    let statusData = {};
-    let commentData = {};
+function closeMenu() {
+  document.getElementById("menuScreen").style.display = "none";
+  renderCarousel();
+}
 
-    function addRange() {
-      const start = parseInt(document.getElementById('rangeStart').value);
-      const end = parseInt(document.getElementById('rangeEnd').value);
-      if (!isNaN(start) && !isNaN(end) && start <= end) {
-        ranges.push([start, end]);
-        document.getElementById('rangeStart').value = '';
-        document.getElementById('rangeEnd').value = '';
-        updateRangeList();
-        buildNumberList();
-      }
+function openReport() {
+  document.getElementById("reportScreen").style.display = "flex";
+  renderFilterToggles();
+  generateReport();
+}
+
+function closeReport() {
+  document.getElementById("reportScreen").style.display = "none";
+}
+
+function renderFilterToggles() {
+  const container = document.getElementById("filterToggles");
+  container.innerHTML = "";
+  statuses.forEach(status => {
+    const btn = document.createElement("button");
+    btn.className = "toggle-btn";
+    btn.classList.toggle("active", reportFilters[status]);
+    btn.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+    btn.onclick = () => {
+      reportFilters[status] = !reportFilters[status];
+      btn.classList.toggle("active");
+      generateReport();
+    };
+    container.appendChild(btn);
+  });
+  document.getElementById("toggleComment").classList.toggle("active", filterCommentsOnly);
+  document.getElementById("toggleModifiedToday")?.classList.toggle("active", filterModifiedToday);
+}
+
+function toggleCommentFilter() {
+  filterCommentsOnly = !filterCommentsOnly;
+  document.getElementById("toggleComment").classList.toggle("active", filterCommentsOnly);
+  generateReport();
+}
+
+function toggleModifiedTodayFilter() {
+  filterModifiedToday = !filterModifiedToday;
+  document.getElementById("toggleModifiedToday").classList.toggle("active", filterModifiedToday);
+  generateReport();
+}
+
+function addRange() {
+  const input = document.getElementById("rangeInput").value.trim();
+  const match = input.match(/^(\d+)-(\d+)$/);
+  if (match) {
+    const [_, start, end] = match.map(Number);
+    ranges.push({ start, end });
+    localStorage.setItem("ranges", JSON.stringify(ranges));
+    renderRangeList();
+    renderCarousel();
+  }
+}
+
+function renderRangeList() {
+  const list = document.getElementById("rangeList");
+  list.innerHTML = "";
+  ranges.forEach((r, i) => {
+    const div = document.createElement("div");
+    div.className = "range-item";
+    div.innerHTML = `${r.start}-${r.end}
+      <span class="range-controls">
+        <button onclick="moveRange(${i}, -1)">↑</button>
+        <button onclick="moveRange(${i}, 1)">↓</button>
+        <button onclick="deleteRange(${i})">✕</button>
+      </span>`;
+    list.appendChild(div);
+  });
+}
+
+function moveRange(index, delta) {
+  if (index + delta >= 0 && index + delta < ranges.length) {
+    const temp = ranges[index];
+    ranges[index] = ranges[index + delta];
+    ranges[index + delta] = temp;
+    localStorage.setItem("ranges", JSON.stringify(ranges));
+    renderRangeList();
+    renderCarousel();
+  }
+}
+
+function deleteRange(index) {
+  ranges.splice(index, 1);
+  localStorage.setItem("ranges", JSON.stringify(ranges));
+  renderRangeList();
+  renderCarousel();
+}
+
+function changeDate(date) {
+  selectedDate = date;
+  renderCarousel();
+}
+
+function generateUnitList() {
+  let list = [];
+  ranges.forEach(r => {
+    for (let i = r.start; i <= r.end; i++) list.push(i);
+  });
+  return list;
+}
+
+function renderCarousel() {
+  const list = generateUnitList();
+  const carousel = document.getElementById("carousel");
+  carousel.innerHTML = "";
+  for (let i = 0; i < 5; i++) {
+    carousel.appendChild(document.createElement("div")).className = "unit-box";
+  }
+  list.forEach(n => {
+    const div = document.createElement("div");
+    div.className = "unit-box";
+    const data = getData(n);
+    const active = statuses.filter(s => data[s]);
+    const color = active.includes("issue") ? "orange" :
+                  active.includes("overlocked") ? "red" :
+                  active.includes("locked") ? "green" : "white";
+    div.style.background = color;
+
+    if (active.length > 1) {
+      const icon = document.createElement("span");
+      icon.className = "unit-icon multi";
+      icon.textContent = "†";
+      div.appendChild(icon);
+    }
+    if (data.comment) {
+      const icon = document.createElement("span");
+      icon.className = "unit-icon comment";
+      icon.textContent = "*";
+      div.appendChild(icon);
+    }
+    if (data.modified && isToday(data.modified)) {
+      const icon = document.createElement("span");
+      icon.className = "unit-icon modified";
+      div.appendChild(icon);
     }
 
-    function updateRangeList() {
-      const list = document.getElementById('rangeList');
-      list.innerHTML = ranges.map(r => `<span>${r[0]}–${r[1]}</span>`).join(', ');
-    }
+    const number = document.createElement("span");
+    number.textContent = n;
+    div.appendChild(number);
+    div.onclick = () => selectUnit(n);
+    carousel.appendChild(div);
+  });
+  for (let i = 0; i < 5; i++) {
+    carousel.appendChild(document.createElement("div")).className = "unit-box";
+  }
+  const fallback = list.includes(currentUnit) ? currentUnit : list[0];
+  if (fallback != null) {
+    requestAnimationFrame(() => selectUnit(fallback));
+  }
+  updateStatusTracker();
+}
 
-    function buildNumberList() {
-      numbers = [];
-      ranges.forEach(([start, end]) => {
-        for (let i = start; i <= end; i++) numbers.push(i);
-      });
-      renderCarousel();
-      currentIndex = 0;
-      loadState();
-    }
+function isToday(dateStr) {
+  const today = new Date().toISOString().split('T')[0];
+  return dateStr === today;
+}
 
-    function renderCarousel() {
-      const container = document.getElementById('numberCarousel');
-      container.innerHTML = '';
-      numbers.forEach((n, i) => {
-        const box = document.createElement('div');
-        box.textContent = n;
-        box.className = i === currentIndex ? 'current' : '';
-        container.appendChild(box);
-      });
-    }
+function formatUSDate(dateStr) {
+  const [y, m, d] = dateStr.split("-");
+  return `${m}/${d}/${y.slice(2)}`;
+}
 
-    function toggleStatus(status) {
-      const num = numbers[currentIndex];
-      if (!statusData[num]) statusData[num] = {};
-      statusData[num][status] = !statusData[num][status];
-      saveState();
-    }
+function selectUnit(n) {
+  currentUnit = n;
+  document.querySelectorAll(".unit-box").forEach(b => {
+    b.classList.toggle("active", b.textContent == n);
+  });
+  const activeBox = [...document.querySelectorAll(".unit-box")].find(b => b.textContent == n);
+  if (activeBox) activeBox.scrollIntoView({ inline: 'center', behavior: 'smooth' });
 
-    function updateComment() {
-      const num = numbers[currentIndex];
-      commentData[num] = document.getElementById('commentInput').value;
-      saveState();
-    }
+  const data = getData(n);
+  statuses.forEach((s, i) => {
+    const btn = document.querySelectorAll(".status-btn")[i];
+    btn.classList.toggle("active", !!data[s]);
+  });
+  document.querySelector(".comment-box").value = data.comment || "";
+  document.getElementById("lastModified").textContent = `Last updated: ${data.modified ? formatUSDate(data.modified) : "—"}`;
+ 
+}
 
-    function prevNumber() {
-      if (currentIndex > 0) currentIndex--;
-      loadState();
-    }
+function getKey(n) {
+  return `unit_${selectedDate}_${n}`;
+}
 
-    function nextNumber() {
-      if (currentIndex < numbers.length - 1) currentIndex++;
-      loadState();
-    }
+function getData(n) {
+  return JSON.parse(localStorage.getItem(getKey(n)) || "{}");
+}
 
-    function loadState() {
-      renderCarousel();
-      const num = numbers[currentIndex];
-      const stat = statusData[num] || {};
-      document.querySelectorAll('.status-btns button').forEach(btn => {
-        btn.classList.toggle('active', stat[btn.textContent.toLowerCase()]);
-      });
-      document.getElementById('commentInput').value = commentData[num] || '';
-    }
+function getHistoryKey(n) {
+  return `history_${n}`;
+}
 
-    function saveState() {
-      localStorage.setItem('tracker_status', JSON.stringify(statusData));
-      localStorage.setItem('tracker_comment', JSON.stringify(commentData));
-    }
+function getHistory(n) {
+  return JSON.parse(localStorage.getItem(getHistoryKey(n)) || "[]");
+}
 
-    window.addEventListener('load', () => {
-      const storedStatus = localStorage.getItem('tracker_status');
-      const storedComment = localStorage.getItem('tracker_comment');
-      if (storedStatus) statusData = JSON.parse(storedStatus);
-      if (storedComment) commentData = JSON.parse(storedComment);
+function saveHistory(n, data) {
+  let log = getHistory(n);
+  log.push({ date: new Date().toISOString(), ...data });
+  localStorage.setItem(getHistoryKey(n), JSON.stringify(log));
+}
+
+function renderHistory(n) {
+  const container = document.getElementById("historyBox");
+  const log = getHistory(n).slice(-5).reverse();
+  container.innerHTML = log.length
+    ? "Recent History:\n" + log.map(e => {
+        const d = formatUSDate(e.date.split("T")[0]);
+        const s = statuses.filter(k => e[k]).join(", ");
+        const c = e.comment ? ` | ${e.comment}` : "";
+        return `- ${d}: ${s}${c}`;
+      }).join("\n")
+    : "No history yet.";
+}
+
+
+function openHistory() {
+  const historyUnitLabel = document.getElementById("historyUnit");
+  const container = document.getElementById("historyOutput");
+  const log = getHistory(currentUnit).slice().reverse();
+  historyUnitLabel.textContent = currentUnit;
+  container.innerHTML = log.length
+    ? log.map(e => {
+        const d = formatUSDate(e.date.split("T")[0]);
+        const s = statuses.filter(k => e[k]).join(", ");
+        const c = e.comment ? ` | ${e.comment}` : "";
+        return `- ${d}: ${s}${c}`;
+      }).join("<br>")
+    : "No history available.";
+  document.getElementById("historyScreen").style.display = "flex";
+}
+
+function closeHistory() {
+  document.getElementById("historyScreen").style.display = "none";
+}
+
+function animateGlow(n) {
+  const box = [...document.querySelectorAll(".unit-box")].find(b => b.textContent == n);
+  if (box) {
+    box.classList.add("save-glow");
+    setTimeout(() => box.classList.remove("save-glow"), 500);
+  }
+}
+
+function saveData() {
+  if (!currentUnit) return;
+  const key = getKey(currentUnit);
+  const old = getData(currentUnit);
+  const data = {};
+  let changed = false;
+
+  statuses.forEach((s, i) => {
+    const btn = document.querySelectorAll(".status-btn")[i];
+    data[s] = btn.classList.contains("active");
+    if (data[s] !== old[s]) changed = true;
+  });
+
+  data.comment = document.querySelector(".comment-box").value.trim();
+  if (data.comment !== (old.comment || "")) changed = true;
+
+  if (changed) {
+    const now = new Date().toISOString().split("T")[0];
+    data.modified = now;
+    saveHistory(currentUnit, data);
+    animateGlow(currentUnit);
+  } else {
+    data.modified = old.modified;
+  }
+
+  localStorage.setItem(key, JSON.stringify(data));
+  renderCarousel();
+}
+
+function toggleStatus(status) {
+  const index = statuses.indexOf(status);
+  const btn = document.querySelectorAll(".status-btn")[index];
+  btn.classList.toggle("active");
+  saveData();
+}
+
+function previousUnit() {
+  const list = generateUnitList();
+  const i = list.indexOf(currentUnit);
+  if (i > 0) selectUnit(list[i - 1]);
+}
+
+function nextUnit() {
+  const list = generateUnitList();
+  const i = list.indexOf(currentUnit);
+  if (i < list.length - 1) selectUnit(list[i + 1]);
+}
+
+function updateStatusTracker() {
+  const list = generateUnitList();
+  const counts = { locked: 0, vacant: 0, overlocked: 0, issue: 0 };
+  list.forEach(n => {
+    const data = getData(n);
+    statuses.forEach(s => {
+      if (data[s]) counts[s]++;
     });
+  });
+  document.getElementById("statusTracker").textContent =
+    `Locked: ${counts.locked} | Vacant: ${counts.vacant} | Overlocked: ${counts.overlocked} | Issue: ${counts.issue}`;
+}
 
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js');
+function generateReport() {
+  const list = generateUnitList();
+  let out = "";
+  list.forEach(n => {
+    const data = getData(n);
+    const active = statuses.filter(s => data[s]);
+    const hasMatch = active.some(s => reportFilters[s]);
+    const include =
+      hasMatch &&
+      (!filterCommentsOnly || data.comment) &&
+      (!filterModifiedToday || (data.modified && isToday(data.modified)));
+    if (include) {
+      out += `Unit ${n}: ${active.join(", ")}${data.comment ? " | " + data.comment : ""}\n`;
     }
-  </script>
+  });
+  document.getElementById("reportOutput").textContent = out || "No matching results.";
+}
+
+renderCarousel();
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js');
+}
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js').then(reg => {
+    console.log("✓ Service worker registered");
+  });
+
+  navigator.serviceWorker.ready.then(() => {
+    console.log("✓ Service worker ready and offline cache is primed");
+    const banner = document.getElementById("offlineReadyBanner");
+    if (banner) {
+      banner.style.display = "block";
+      setTimeout(() => banner.style.display = "none", 3000); // hide after 3s
+    }
+  });
+}
+
+function forceOfflineSetup() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js').then(reg => {
+      reg.update(); // try to get latest SW
+      navigator.serviceWorker.ready.then(() => {
+        caches.open('storage-app-v1').then(cache => {
+          cache.addAll([
+            './',
+            './index.html',
+            './manifest.json',
+            './icon-192.png',
+            './icon-512.png'
+          ]).then(() => {
+            alert("✓ App is now cached for offline use.");
+          }).catch(err => {
+            alert("⚠️ Some files failed to cache.");
+            console.error(err);
+          });
+        });
+      });
+    });
+  } else {
+    alert("❌ Offline support is not available in this browser.");
+  }
+}
+</script>
+
+
 </body>
 </html>
