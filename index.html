@@ -77,7 +77,7 @@
     }
 
     .unit-box.active {
-      border: 3px solid dodgerblue;
+      border: 3px solid dodgerblue !important;
     }
 
     .unit-icon {
@@ -293,7 +293,7 @@
       <button class="status-btn" onclick="toggleStatus('overlocked')">Overlocked</button>
       <button class="status-btn" onclick="toggleStatus('issue')">Issue</button>
     </div>
-    <textarea class="comment-box" placeholder="Comment..." oninput="saveData()"></textarea>
+    <textarea class="comment-box" placeholder="Comment..." onblur="saveData()"></textarea>
     <div class="last-modified" id="lastModified">Last updated: —</div>
 <button onclick="openHistory()" class="toggle-btn" style="margin-bottom: 10px;">View History</button>
 
