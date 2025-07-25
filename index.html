@@ -293,6 +293,7 @@
   </style>
 </head>
 <body>
+  <div class="main-container" style="position: relative;">
   <div class="top-bar" onclick="openMenu()">☰ Menu</div>
 
 <div id="offlineReadyBanner" style="display:none; text-align:center; background:#4CAF50; color:white; padding:10px; font-weight:bold;">
@@ -358,7 +359,7 @@
   <div class="report-output" id="historyOutput">Loading...</div>
   <button class="big-close-btn" onclick="closeHistory()">Close</button>
 </div>    
-
+</div>
 <script>
 let ranges = JSON.parse(localStorage.getItem("ranges") || "[]");
 let selectedDate = new Date().toISOString().split('T')[0];
