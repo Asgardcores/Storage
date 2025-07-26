@@ -171,23 +171,26 @@
   box-shadow: inset 2px 2px 5px #999;
   z-index: 100;
 }
-    .nav-buttons {
-      display: flex;
-      width: 100%;
-      gap: 10px;
-    }
+  .nav-buttons {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  width: 100%;
+  background: #f0f0f0;
+  z-index: 5;
+}
 
-    .nav-buttons button {
-      flex: 1;
-      padding: 20px;
-      font-size: 1em;
-      font-weight: bold;
-      border: none;
-      border-radius: 0;
-      background: steelblue;
-      color: white;
-    }
-
+.nav-buttons button {
+  flex: 1;
+  padding: 24px;
+  font-size: 1.1em;
+  font-weight: bold;
+  border: none;
+  background: steelblue;
+  color: white;
+  border-top: 1px solid #ccc;
+  touch-action: manipulation;
+}
     .menu-screen, .report-screen {
       position: fixed;
       inset: 0;
@@ -341,7 +344,7 @@
     <button onclick="openReport()">Generate Report</button>
     <button onclick="closeMenu()">Close Menu</button>
   </div>
-<button onclick="forceOfflineSetup()" class="toggle-btn">Download for Offline Use</button>
+
   <div class="report-screen" id="reportScreen">
     <h3>Report Filters</h3>
     <div class="toggle-row" id="filterToggles"></div>
