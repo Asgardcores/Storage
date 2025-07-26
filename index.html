@@ -548,7 +548,8 @@ function formatUSDate(dateStr) {
 function selectUnit(n) {
   currentUnit = n;
   document.querySelectorAll(".unit-box").forEach(b => {
-    b.classList.toggle("active", b.textContent == n);
+    const span = b.querySelector("span");
+b.classList.toggle("active", span && span.textContent == n);
   });
   const activeBox = [...document.querySelectorAll(".unit-box")].find(b => b.textContent == n);
   if (activeBox) activeBox.scrollIntoView({ inline: 'center', behavior: 'smooth' });
