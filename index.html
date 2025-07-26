@@ -297,6 +297,36 @@
   gap: 1em;
   overflow-y: auto;
 }
+
+.contact-info {
+  margin: 10px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.contact-row {
+  display: flex;
+  gap: 10px;
+}
+
+.contact-row input {
+  flex: 1;
+  padding: 10px;
+  font-size: 1em;
+  border-radius: 6px;
+  border: 1px solid #aaa;
+}
+
+#contactNote {
+  width: 100%;
+  padding: 10px;
+  font-size: 1em;
+  min-height: 60px;
+  border-radius: 6px;
+  border: 1px solid #aaa;
+  resize: vertical;
+}
   </style>
 </head>
 <body>
@@ -323,6 +353,14 @@
 
 
 <button onclick="openHistory()" class="toggle-btn" style="margin-bottom: 10px;">View History</button>
+
+<div class="contact-info">
+  <div class="contact-row">
+    <input type="text" id="contactName" placeholder="Name">
+    <input type="tel" id="contactPhone" placeholder="Phone">
+  </div>
+  <textarea id="contactNote" placeholder="Note..."></textarea>
+</div>
 
     <div class="nav-buttons">
       <button onclick="previousUnit()">◀ Previous</button>
@@ -552,11 +590,11 @@ function formatUSDate(dateStr) {
 function selectUnit(n) {
   currentUnit = n;
   document.querySelectorAll(".unit-box").forEach(b => {
-const numberSpan = Array.from(b.children).find(child =>
-  child.nodeName === "SPAN" &&
-  !child.classList.contains("unit-icon")
-);
-b.classList.toggle("active", numberSpan && numberSpan.textContent == String(n)); });
+    const numberSpan = Array.from(b.children).find(child =>
+      child.nodeName === "SPAN" && !child.classList.contains("unit-icon")
+    );
+    b.classList.toggle("active", numberSpan && numberSpan.textContent == String(n));
+  });
   const activeBox = [...document.querySelectorAll(".unit-box")].find(b => b.textContent == n);
   if (activeBox) activeBox.scrollIntoView({ inline: 'center', behavior: 'smooth' });
 
@@ -565,9 +603,15 @@ b.classList.toggle("active", numberSpan && numberSpan.textContent == String(n));
     const btn = document.querySelectorAll(".status-btn")[i];
     btn.classList.toggle("active", !!data[s]);
   });
+
   document.querySelector(".comment-box").value = data.comment || "";
   document.getElementById("lastModified").textContent = `Last updated: ${data.modified ? formatUSDate(data.modified) : "—"}`;
- document.getElementById("redundantUnitBox").textContent = n;
+  document.getElementById("redundantUnitBox").textContent = n;
+
+  // Load Name, Phone, Note fields
+  document.getElementById("nameInput").value = data.name || "";
+  document.getElementById("phoneInput").value = data.phone || "";
+  document.getElementById("noteInput").value = data.note || "";
 }
 
 function getKey(n) {
@@ -604,7 +648,6 @@ function renderHistory(n) {
       }).join("\n")
     : "No history yet.";
 }
-
 
 function openHistory() {
   const historyUnitLabel = document.getElementById("historyUnit");
@@ -648,7 +691,18 @@ function saveData() {
   });
 
   data.comment = document.querySelector(".comment-box").value.trim();
-  if (data.comment !== (old.comment || "")) changed = true;
+  data.name = document.getElementById("nameInput").value.trim();
+  data.phone = document.getElementById("phoneInput").value.trim();
+  data.note = document.getElementById("noteInput").value.trim();
+
+  if (
+    data.comment !== (old.comment || "") ||
+    data.name !== (old.name || "") ||
+    data.phone !== (old.phone || "") ||
+    data.note !== (old.note || "")
+  ) {
+    changed = true;
+  }
 
   if (changed) {
     const now = new Date().toISOString().split("T")[0];
@@ -728,7 +782,7 @@ if ('serviceWorker' in navigator) {
     const banner = document.getElementById("offlineReadyBanner");
     if (banner) {
       banner.style.display = "block";
-      setTimeout(() => banner.style.display = "none", 3000); // hide after 3s
+      setTimeout(() => banner.style.display = "none", 3000);
     }
   });
 }
@@ -736,7 +790,7 @@ if ('serviceWorker' in navigator) {
 function forceOfflineSetup() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('service-worker.js').then(reg => {
-      reg.update(); // try to get latest SW
+      reg.update();
       navigator.serviceWorker.ready.then(() => {
         caches.open('storage-app-v1').then(cache => {
           cache.addAll([
@@ -759,7 +813,6 @@ function forceOfflineSetup() {
   }
 }
 </script>
-
 
 </body>
 </html>
