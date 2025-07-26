@@ -548,9 +548,11 @@ function formatUSDate(dateStr) {
 function selectUnit(n) {
   currentUnit = n;
   document.querySelectorAll(".unit-box").forEach(b => {
-    const span = b.querySelector("span");
-b.classList.toggle("active", span && span.textContent == n);
-  });
+const numberSpan = Array.from(b.children).find(child =>
+  child.nodeName === "SPAN" &&
+  !child.classList.contains("unit-icon")
+);
+b.classList.toggle("active", numberSpan && numberSpan.textContent == String(n)); });
   const activeBox = [...document.querySelectorAll(".unit-box")].find(b => b.textContent == n);
   if (activeBox) activeBox.scrollIntoView({ inline: 'center', behavior: 'smooth' });
 
