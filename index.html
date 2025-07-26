@@ -172,23 +172,24 @@
   z-index: 100;
 }
   .nav-buttons {
-  position: sticky;
+  position: fixed;
   bottom: 0;
-  display: flex;
+  left: 0;
   width: 100%;
+  display: flex;
+  z-index: 99;
   background: #f0f0f0;
-  z-index: 5;
+  border-top: 1px solid #ccc;
 }
 
 .nav-buttons button {
   flex: 1;
   padding: 24px;
-  font-size: 1.1em;
+  font-size: 1.2em;
   font-weight: bold;
   border: none;
   background: steelblue;
   color: white;
-  border-top: 1px solid #ccc;
   touch-action: manipulation;
 }
     .menu-screen, .report-screen {
