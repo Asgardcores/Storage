@@ -6,7 +6,7 @@ self.addEventListener('install', (e)=>{
     './index.html',
     './app.css',
     './app.js',
-    './manifest.json'
+    './manifest.json',
 	'./cloud-sync.js',
 	'./cloud-ui.js',
   ])));
@@ -43,4 +43,5 @@ self.addEventListener('fetch', (e)=>{
     }
   })());
 });
+
 
