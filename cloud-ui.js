@@ -2,7 +2,7 @@
   const $ = (q, r = document) => r.querySelector(q);
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
-  // Inject compact styles + state colors (blue/green/yellow) and black borders
+  // Compact styles + state colors + top/bottom borders
   (function injectStyles() {
     if ($('#cloudSyncStyles')) return;
     const css = `
@@ -39,7 +39,7 @@
     return `${mm}/${dd}/${yy} ${dt.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
   }
 
-  // ----- Status row placement (just above the carousel) -----
+  // --- Status row placement (just above the carousel) ---
   function ensureStatusRow() {
     let row = $('#syncStatusRow');
     if (!row) {
@@ -86,15 +86,12 @@
     if (row && s) row.textContent = `Last synced: ${fmt(s.lastSync)} • Pending: ${s.pending}`;
   }
 
-  // ----- UI refresh hook (U2) -----
+  // ===== UI refresh right after a successful sync =====
   function refreshAfterSync() {
-    // Preserve the current unit if we can
     const prevUnit = (typeof window.currentUnit === 'function') ? window.currentUnit() : null;
 
-    // If the visible set could have changed (e.g., overlocked filter), rebuild the carousel
     if (typeof window.buildCarousel === 'function') window.buildCarousel();
 
-    // Try to keep selection and refresh details
     if (typeof window.getVisibleUnits === 'function' && typeof window.loadUnit === 'function') {
       const vis = window.getVisibleUnits();
       if (prevUnit != null && vis.includes(prevUnit)) {
@@ -110,7 +107,6 @@
       window.loadUnit(prevUnit);
     }
 
-    // Refresh badges, highlights, report, and timestamps
     if (typeof window.reflectCarouselBadges === 'function') window.reflectCarouselBadges();
     if (typeof window.highlightActivePill === 'function') window.highlightActivePill();
     if (typeof window.centerActive === 'function') window.centerActive();
@@ -118,7 +114,7 @@
     if (typeof window.updateLastUpdatedLabel === 'function') window.updateLastUpdatedLabel();
   }
 
-  // ----- Debounced auto-sync on changes -----
+  // --- Debounced auto-sync on changes ---
   let syncTimer = null;
   let lastSyncAt = 0;
   const DEBOUNCE_MS = 5000;       // wait 5s after last change
@@ -129,8 +125,7 @@
     setStatusState('syncing');
     try {
       await window.CloudSync.syncNow();
-      // Immediately refresh UI from local storage (now merged with remote)
-      refreshAfterSync();
+      refreshAfterSync();   // <-- re-read storage and update UI immediately
       updateStatus();
       setStatusState('success');
       lastSyncAt = Date.now();
@@ -155,16 +150,13 @@
     if (!document.hidden) scheduleSync();
   });
 
-  // ----- UI mount + “Sync on Report” -----
+  // --- UI mount + “Sync on Report” ---
   function mountUI() {
     const bar = document.querySelector('header .toolbar') || document.querySelector('header');
     if (!bar) return;
 
-    // Remove any legacy inline status
-    const old = $('#syncStatus');
-    if (old) old.remove();
+    const old = $('#syncStatus'); if (old) old.remove();
 
-    // Sync button
     if (!$('#btnCloudSync')) {
       const btn = document.createElement('button');
       btn.id = 'btnCloudSync';
@@ -177,7 +169,6 @@
       bar.appendChild(btn);
     }
 
-    // Sync when Report is opened (non-blocking)
     const reportBtn = $('#btnReport');
     if (reportBtn && !reportBtn.dataset.cloudSyncHook) {
       reportBtn.dataset.cloudSyncHook = '1';
@@ -185,7 +176,7 @@
     }
 
     const row = ensureStatusRow();
-    watchForCarousel(row);  // make sure it ends up right above the carousel
+    watchForCarousel(row);
     updateStatus();
   }
 
@@ -194,7 +185,7 @@
     setStatusState('syncing');
     try {
       await window.CloudSync.syncNow();
-      refreshAfterSync();   // ensure UI matches freshly pulled data
+      refreshAfterSync();   // <-- also on first load
       updateStatus();
       setStatusState('success');
       lastSyncAt = Date.now();
