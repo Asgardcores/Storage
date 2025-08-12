@@ -2,7 +2,7 @@
 // Update these with YOUR values:
 (function(){
   const ENDPOINT = 'https://sst-sync.c66dvym747.workers.dev/sst/v1'; // your Worker URL
-  const API_KEY  = '<<<PASTE-YOUR-API-KEY>>>'; // same secret you set in Cloudflare
+  const API_KEY  = 'z4k8S2xL-1yNfA7q-b93vV0W-ptR1mQ6'; // same secret you set in Cloudflare
 
   // LocalStorage keys (kept identical to your app; just not global)
   const K = {
@@ -137,3 +137,4 @@
   // Expose ONLY this
   window.CloudSync = { syncNow, getStatus };
 })();
+
