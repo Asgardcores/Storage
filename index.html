@@ -186,7 +186,8 @@
   </div>
 
   <!-- Ranges Drawer -->
-  <dialog id="rangesDrawer" class="drawer">
+ <div id="rangesDrawer" class="drawer" role="dialog" aria-modal="true">
+
     <div class="shade" data-close></div>
     <div class="panel">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem">
@@ -221,8 +222,9 @@
         <div class="muted" style="margin-top:.35rem">These save to this device only.</div>
       </div>
     </div>
-  </dialog>
-
+  </div>
+<script defer src="cloud-sync.js"></script>
+<script defer src="cloud-ui.js"></script>
   <!-- App -->
   <script defer src="app.js"></script>
 

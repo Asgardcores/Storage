@@ -30,6 +30,13 @@ body{
   overscroll-behavior-y:none;
 }
 
+/* Prevent horizontal scrolling page-wide */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+
 .app{max-width:900px;margin:0 auto;display:flex;flex-direction:column;min-height:100vh}
 header{position:sticky;top:0;background:var(--card);box-shadow:var(--shadow);z-index:10}
 header .row{display:flex;gap:.5rem;align-items:center;padding:.5rem .75rem;flex-wrap:wrap}
@@ -165,7 +172,8 @@ textarea{min-height:88px;resize:vertical}
 .filter-chip[data-on="true"]{background:var(--steel);color:#fff;border-color:var(--steel)}
 
 /* Drawer / Ranges */
-.drawer{position:fixed;inset:0;display:none}
+.drawer{position:fixed;inset:0;display:none;z-index:1000}
+
 .drawer[open]{display:block}
 .drawer .shade{position:absolute;inset:0;background:rgba(0,0,0,.35)}
 .drawer .panel{
