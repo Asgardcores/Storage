@@ -34,16 +34,15 @@ const dateKey = (iso) => LS.DATE_DATA_PREFIX + iso;
 const getDateData = (iso) => JSON.parse(localStorage.getItem(dateKey(iso)) || '{}');
 const setDateData = (iso, data) => localStorage.setItem(dateKey(iso), JSON.stringify(data));
 
-// Build units list from ranges
+// Units from ranges
 const unitsFromRanges = (ranges) => {
-  const arr = [];
+  const out = [];
   for (const r of ranges){
     const s = Number(r.start), e = Number(r.end);
-    if (!Number.isFinite(s) || !Number.isFinite(e)) continue;
-    if (e < s) continue;
-    for (let n=s; n<=e; n++) arr.push(n);
+    if (!Number.isFinite(s) || !Number.isFinite(e) || e < s) continue;
+    for (let n=s; n<=e; n++) out.push(n);
   }
-  return arr;
+  return out;
 };
 
 // Status helpers
@@ -55,18 +54,6 @@ const statusPriority = (set) => {
   return 'Vacant';
 };
 
-// Map statuses to report blocks (simple)
-function statusBlocksHTML(statuses){
-  const order = ['Issue','Overlocked','Locked','Vacant'];
-  const cls   = { Issue:'issue', Overlocked:'overlocked', Locked:'locked', Vacant:'vacant' };
-  const have = order.filter(k => statuses.has(k));
-  if (!have.length) return '<span class="muted">—</span>';
-  return '<div class="status-cell">' +
-         have.map(k => `<span class="status-block ${cls[k]}" title="${k}" aria-label="${k}"></span>`).join('') +
-         '</div>';
-}
-
-// Effective statuses (current date or forward fallback)
 function effectiveStatusesForUnit(n){
   const data = getDateData(state.dateISO);
   const rec = data[n] || {};
@@ -85,31 +72,24 @@ const state = {
 };
 
 /****************
- * Initialization *
- ***************/
+ * Init
+ ****************/
 function init(){
-  // default ranges
   if (getRanges().length === 0) setRanges([{start:1,end:80}]);
 
   const dp = $('#datePicker'); if (dp) dp.value = state.dateISO;
 
-  bindInputs(); // bind first so buttons work even if something below fails
-
   rebuildUnits();
+  buildCarousel();
+  wireStatusLegend();
 
-  try { buildCarousel(); } catch(e){ console.warn('buildCarousel failed:', e); }
-  try { wireStatusLegend(); } catch(e){ console.warn('legend failed:', e); }
+  const vis = getVisibleUnits();
+  if (vis.length) loadUnit(currentUnit());
+  updateReport();
+  updateLastUpdatedLabel();
 
-  if (getVisibleUnits().length>0){
-    try { loadUnit(currentUnit()); } catch(e){ console.warn('loadUnit failed:', e); }
-  }else{
-    const h = $('#history'); if (h) h.textContent = 'No history yet.';
-  }
-
-  try { updateReport(); } catch(e){ console.warn('updateReport failed:', e); }
-  try { updateLastUpdatedLabel(); } catch(e){}
-
-  try { setupPWA?.(); } catch(e){}
+  bindInputs();
+  setupPWA();
 }
 
 function rebuildUnits(){
@@ -118,7 +98,7 @@ function rebuildUnits(){
 }
 
 /*********************
- * Edit Flush Utility *
+ * Edit flush
  *********************/
 function flushCurrentEdits(){
   clearTimeout(commentTimer);
@@ -135,8 +115,8 @@ function flushCurrentEdits(){
 }
 
 /****************
- * Carousel UI   *
- ***************/
+ * Carousel
+ ****************/
 function getVisibleUnits(){
   const base = state.units || [];
   if (!state.overlockedOnly) return base;
@@ -224,8 +204,8 @@ function prevUnit(){
 }
 
 /****************
- * Data Binding  *
- ***************/
+ * Data binding
+ ****************/
 function ensureUnitRecord(iso, unit){
   const data = getDateData(iso);
   if (!data[unit]){
@@ -243,10 +223,10 @@ function loadUnit(unit){
   const data = getDateData(state.dateISO)[unit];
   const statuses = new Set(data.statuses||[]);
 
-  // Reflect status buttons
+  // Status buttons
   $$('.status-btn').forEach(btn=> { btn.dataset.active = statuses.has(btn.dataset.key); });
 
-  // Comment + contact (use forward as placeholder)
+  // Comment + contact (show forward as placeholders if blank)
   const forward = getForward()[unit] || {};
   $('#comment').value = data.comment ?? '';
   $('#comment').placeholder = forward.comment ? `(from previous) ${forward.comment}` : 'Comment (persists forward to future dates)';
@@ -254,11 +234,11 @@ function loadUnit(unit){
   $('#contactPhone').value = data.phone ?? forward.phone ?? '';
   $('#contactNote').value = data.note ?? forward.note ?? '';
 
-  // Mini box
-  $('#miniNum').textContent = unit;
-  $('#miniMulti').hidden = !((data.statuses||[]).length > 1);
-  $('#miniNote').hidden = !((data.comment||forward.comment||'').trim().length>0);
-  $('#miniDot').hidden = !wasModifiedToday(data.lastModified);
+  // Mini
+  $('#miniNum')?.textContent = unit;
+  $('#miniMulti')?.toggleAttribute('hidden', !((data.statuses||[]).length > 1));
+  $('#miniNote')?.toggleAttribute('hidden', !((data.comment||forward.comment||'').trim().length>0));
+  $('#miniDot')?.toggleAttribute('hidden', !wasModifiedToday(data.lastModified));
 
   renderHistoryPreview(data.history||[]);
   reflectCarouselBadges();
@@ -285,12 +265,12 @@ function saveUnitChange(unit, updater){
     all[unit] = rec;
     setDateData(iso, all);
 
-    // persist-forward statuses
+    // persist-forward statuses + fields
     const sf = getStatusForward();
     sf[unit] = [...new Set(rec.statuses||[])];
     setStatusForward(sf);
-
     updateForwardFrom(rec, unit);
+
     updateLastUpdatedLabel();
   }
 }
@@ -316,24 +296,8 @@ function updateLastUpdatedLabel(){
 }
 
 /****************
- * Status / Inputs
- ***************/
-function onToggleStatus(key){
-  const unit = currentUnit();
-  saveUnitChange(unit, rec => {
-    const set = new Set(rec.statuses||[]);
-    if (set.has(key)) set.delete(key); else set.add(key);
-    rec.statuses = [...set];
-  });
-  loadUnit(unit);
-  if (state.overlockedOnly){
-    const vis = getVisibleUnits();
-    if (!vis.includes(unit)) state.idx = Math.min(state.idx, Math.max(0, vis.length-1));
-    buildCarousel();
-  }
-  updateReport();
-}
-
+ * Inputs
+ ****************/
 let commentTimer;
 function bindInputs(){
   // statuses
@@ -343,26 +307,29 @@ function bindInputs(){
 
   // comment (debounce + blur)
   const cmt = $('#comment');
-  cmt.addEventListener('input', ()=>{
-    clearTimeout(commentTimer);
-    commentTimer = setTimeout(()=>{
+  if (cmt){
+    cmt.addEventListener('input', ()=>{
+      clearTimeout(commentTimer);
+      commentTimer = setTimeout(()=>{
+        const unit = currentUnit(); if (unit==null) return;
+        saveUnitChange(unit, rec => { rec.comment = $('#comment').value; });
+        reflectCarouselBadges(); updateReport();
+        if (state.overlockedOnly) buildCarousel();
+      }, 800);
+    });
+    cmt.addEventListener('blur', ()=>{
       const unit = currentUnit(); if (unit==null) return;
       saveUnitChange(unit, rec => { rec.comment = $('#comment').value; });
       reflectCarouselBadges(); updateReport();
       if (state.overlockedOnly) buildCarousel();
-    }, 800);
-  });
-  cmt.addEventListener('blur', ()=>{
-    const unit = currentUnit(); if (unit==null) return;
-    saveUnitChange(unit, rec => { rec.comment = $('#comment').value; });
-    reflectCarouselBadges(); updateReport();
-    if (state.overlockedOnly) buildCarousel();
-  });
+    });
+  }
 
   // contacts
   ['contactName','contactPhone','contactNote'].forEach(id=>{
     const el = $('#'+id);
-    el?.addEventListener('blur', ()=>{
+    if (!el) return;
+    el.addEventListener('blur', ()=>{
       const unit = currentUnit(); if (unit==null) return;
       saveUnitChange(unit, rec => {
         rec.name  = $('#contactName')?.value || '';
@@ -373,17 +340,13 @@ function bindInputs(){
     });
   });
 
-  // meta
-  $$('.meta-size').forEach(ch=> ch.addEventListener('change', saveMeta));
-  $$('.meta-type').forEach(ch=> ch.addEventListener('change', saveMeta));
-
   // nav
-  $('#btnNext').addEventListener('click', nextUnit);
-  $('#btnPrev').addEventListener('click', prevUnit);
+  $('#btnNext')?.addEventListener('click', nextUnit);
+  $('#btnPrev')?.addEventListener('click', prevUnit);
 
   // date
-  $('#datePicker').addEventListener('change', ()=>{
-    flushCurrentEdits?.();
+  $('#datePicker')?.addEventListener('change', ()=>{
+    flushCurrentEdits();
     state.dateISO = $('#datePicker').value || todayISO();
     buildCarousel();
     const vis = getVisibleUnits();
@@ -391,18 +354,18 @@ function bindInputs(){
       if (state.idx >= vis.length) state.idx = 0;
       loadUnit(currentUnit());
     } else {
-      const h = $('#history'); if (h) h.textContent = 'No history yet.';
-      const mn = $('#miniNum'); if (mn) mn.textContent = '—';
-      $('#miniMulti')?.setAttribute('hidden','');
-      $('#miniNote')?.setAttribute('hidden','');
-      $('#miniDot')?.setAttribute('hidden','');
+      $('#history').textContent = 'No history yet.';
+      $('#miniNum').textContent = '—';
+      $('#miniMulti').setAttribute('hidden','');
+      $('#miniNote').setAttribute('hidden','');
+      $('#miniDot').setAttribute('hidden','');
     }
     updateReport();
     updateLastUpdatedLabel();
   });
 
   // report toggle
-  $('#btnReport').addEventListener('click', ()=>{
+  $('#btnReport')?.addEventListener('click', ()=>{
     const page = $('#reportPage'); if (!page) return;
     page.toggleAttribute('active');
     if (page.hasAttribute('active')){ updateReport(); page.scrollIntoView({behavior:'smooth'}); }
@@ -417,42 +380,20 @@ function bindInputs(){
   });
 
   // ranges
-  $('#btnRanges').addEventListener('click', openRanges);
+  $('#btnRanges')?.addEventListener('click', openRanges);
   $$('#rangesDrawer [data-close]').forEach(el=> el.addEventListener('click', closeRanges));
-  $('#addRange').addEventListener('click', addRangeRow);
-  $('#clearAllData').addEventListener('click', ()=>{
+  // Also close on ESC anywhere:
+  document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') closeRanges(); });
+
+  $('#addRange')?.addEventListener('click', addRangeRow);
+  $('#clearAllData')?.addEventListener('click', ()=>{
     if (confirm('This will remove ALL saved data, ranges, meta, and forward fields. Continue?')){
       localStorage.clear(); location.reload();
     }
   });
 
-  // overlocked filter
-  const filtBtn = $('#toggleOverlockedFilter');
-  filtBtn.addEventListener('click', ()=>{
-    flushCurrentEdits?.();
-    const curr = currentUnit();
-    state.overlockedOnly = !state.overlockedOnly;
-    filtBtn.dataset.on = String(state.overlockedOnly);
-    filtBtn.setAttribute('aria-pressed', state.overlockedOnly ? 'true' : 'false');
-    const vis = getVisibleUnits();
-    state.idx = Math.max(0, vis.indexOf(curr));
-    buildCarousel();
-    if (vis.length > 0){
-      if (state.idx < 0) state.idx = 0;
-      loadUnit(currentUnit());
-    } else {
-      const h = $('#history'); if (h) h.textContent = 'No history yet.';
-      const mn = $('#miniNum'); if (mn) mn.textContent = '—';
-      $('#miniMulti')?.setAttribute('hidden','');
-      $('#miniNote')?.setAttribute('hidden','');
-      $('#miniDot')?.setAttribute('hidden','');
-    }
-    highlightActivePill();
-    centerActive();
-  });
-
-  // history
-  $('#btnViewHistory').addEventListener('click', ()=>{
+  // history helpers
+  $('#btnViewHistory')?.addEventListener('click', ()=>{
     const unit = currentUnit(); if (unit==null) return;
     const rec = ensureUnitRecord(state.dateISO, unit);
     const lines = (rec.history||[]).map(h=>{
@@ -465,7 +406,7 @@ function bindInputs(){
       : 'No history yet.');
   });
 
-  $('#btnClearCommentFuture').addEventListener('click', ()=>{
+  $('#btnClearCommentFuture')?.addEventListener('click', ()=>{
     const unit = currentUnit(); if (unit==null) return;
     const fwd = getForward();
     if (fwd[unit]){ fwd[unit].comment = ''; setForward(fwd); }
@@ -474,30 +415,45 @@ function bindInputs(){
     reflectCarouselBadges(); updateReport();
   });
 
-  // blueprint/report sheet
-  $('#btnBlueprintImport').addEventListener('click', ()=> $('#blueprintFile')?.click());
-  $('#blueprintFile').addEventListener('change', (e)=>{
-    const f=e.target.files?.[0];
-    if (f) importBlueprintFile(f, $('#optIncludeUnitsSheet')?.checked ?? true);
-    e.target.value='';
+  // overlocked filter
+  const filtBtn = $('#toggleOverlockedFilter');
+  filtBtn?.addEventListener('click', ()=>{
+    flushCurrentEdits();
+    const curr = currentUnit();
+    state.overlockedOnly = !state.overlockedOnly;
+    filtBtn.dataset.on = String(state.overlockedOnly);
+    filtBtn.setAttribute('aria-pressed', state.overlockedOnly ? 'true' : 'false');
+    const vis = getVisibleUnits();
+    state.idx = Math.max(0, vis.indexOf(curr));
+    buildCarousel();
+    if (vis.length > 0){
+      if (state.idx < 0) state.idx = 0;
+      loadUnit(currentUnit());
+    } else {
+      $('#history').textContent = 'No history yet.';
+      $('#miniNum').textContent = '—';
+      $('#miniMulti').setAttribute('hidden','');
+      $('#miniNote').setAttribute('hidden','');
+      $('#miniDot').setAttribute('hidden','');
+    }
+    highlightActivePill();
+    centerActive();
   });
-  $('#btnApplyStatusesSheet').addEventListener('click', applyStatusesToSheet);
-  $('#btnSaveSheet').addEventListener('click', saveSheetXLSX);
-  $('#btnPrintSheet').addEventListener('click', printSheet);
 }
 
 /***********
- * Report (fallback table)
+ * Report
  **********/
 function updateReport(){
   const tbody = $('#reportTable tbody');
+  if (!tbody) return;
   tbody.innerHTML = '';
 
   const filters = new Set($$('#reportPage .toggle')
     .filter(t=>t.dataset.key && t.dataset.on==='true')
     .map(t=>t.dataset.key));
 
-  const onlyModifiedToday = $('#toggleModifiedToday').dataset.on === 'true';
+  const onlyModifiedToday = $('#toggleModifiedToday')?.dataset.on === 'true';
 
   const data = getDateData(state.dateISO);
   const forward = getForward();
@@ -522,7 +478,7 @@ function updateReport(){
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${n}</strong>${ (statuses.size>1) ? ' <span title="Multiple statuses">†</span>':'' }${ comment ? ' <span title="Has comment">*</span>':'' }</td>
-      <td>${statusBlocksHTML(statuses)}</td>
+      <td>${[...statuses].join(', ') || '<span class="muted">—</span>'}</td>
       <td>${comment || '<span class="muted">—</span>'}</td>
       <td>${namePhone || '<span class="muted">—</span>'}</td>
       <td>${rec.lastModified ? fmtUS(rec.lastModified) : '<span class="muted">—</span>'}</td>`;
@@ -547,13 +503,14 @@ function wireStatusLegend(){
 }
 
 /****************
- * Ranges Drawer *
- ***************/
-function openRanges(){ renderRangeList(); $('#rangesDrawer').setAttribute('open',''); }
-function closeRanges(){ $('#rangesDrawer').removeAttribute('open'); }
+ * Ranges Drawer
+ ****************/
+function openRanges(){ renderRangeList(); $('#rangesDrawer')?.setAttribute('open',''); }
+function closeRanges(){ $('#rangesDrawer')?.removeAttribute('open'); }
 
 function renderRangeList(){
   const list = $('#rangeList');
+  if (!list) return;
   list.innerHTML = '';
   const ranges = getRanges();
   ranges.forEach((r, idx)=>{
@@ -578,6 +535,7 @@ function renderRangeList(){
 
 function saveRanges(){
   const list = $('#rangeList');
+  if (!list) return;
   const rows = Array.from(list.children);
   const ranges = rows.map(r=>({ start:Number(r.children[0].value||0), end:Number(r.children[1].value||0) }))
                      .filter(x=>Number.isFinite(x.start) && Number.isFinite(x.end));
@@ -602,276 +560,12 @@ function addRangeRow(){
 }
 
 /****************
- * PWA: SW + Manifest
- ***************/
+ * PWA
+ ****************/
 function setupPWA(){
-  // Safe no-op if file:// or no sw.js
   if ('serviceWorker' in navigator){
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
   }
-}
-
-/* ========= Spreadsheet (Blueprint) integration ========= */
-const sheetState = {
-  rows: null,     // 2D array (AOA)
-  hasHeader: true,
-  name: null,
-  pairs: []       // [{unitCol, statusCol}]
-};
-
-// Parse a unit number from any cell
-function parseUnitNumber(v){
-  const m = String(v ?? '').match(/\d+/);
-  return m ? Number(m[0]) : NaN;
-}
-
-// Find all (Unit, Status) column PAIRS across the sheet
-function detectPairs(rows){
-  const hdr = rows[0] || [];
-  const lower = hdr.map(v => String(v ?? '').toLowerCase().trim());
-  const unitNames = ['unit','#','unit #','unit number','unitno','unit id','numbers','number'];
-  const statusNames = ['status','statuses','state'];
-
-  let hasHeader = lower.some(h => unitNames.includes(h) || statusNames.includes(h));
-  const pairs = [];
-
-  // Header-driven pairs (Unit followed by Status)
-  if (hasHeader){
-    for (let i=0; i<lower.length; i++){
-      if (unitNames.includes(lower[i])){
-        pairs.push({ unitCol: i, statusCol: i + 1 });
-      }
-    }
-  }
-
-  // Heuristic if none found
-  if (pairs.length === 0){
-    hasHeader = false;
-    const rowsToScan = rows.slice(0, Math.min(rows.length, 50));
-    const ncols = Math.max(0, ...rowsToScan.map(r => r.length));
-    const unitScore = new Array(ncols).fill(0);
-    for (const r of rowsToScan){
-      for (let c=0; c<ncols; c++){
-        if (Number.isFinite(parseUnitNumber(r[c]))) unitScore[c]++;
-      }
-    }
-    for (let c=0; c<ncols; c++){
-      if (unitScore[c] >= Math.max(3, rowsToScan.length * 0.5)){
-        pairs.push({ unitCol: c, statusCol: c + 1 });
-      }
-    }
-  }
-
-  // Normalize (status immediately to the right)
-  for (const p of pairs){ p.statusCol = p.unitCol + 1; }
-  return { hasHeader, pairs };
-}
-
-// Ensure each pair has a writable Status column
-function ensureStatusColumns(rows, pairs, hasHeader){
-  const ensureLen = (row, len) => { while (row.length < len) row.push(''); };
-  if (rows.length === 0) rows.push([]);
-
-  for (const p of pairs){
-    const need = p.unitCol + 2;
-    ensureLen(rows[0], need);
-    if (hasHeader){
-      rows[0][p.unitCol]   = rows[0][p.unitCol]   || 'Unit';
-      rows[0][p.unitCol+1] = rows[0][p.unitCol+1] || 'S'; // one-letter marks
-    }
-    for (let r = hasHeader ? 1 : 0; r < rows.length; r++){
-      ensureLen(rows[r], need);
-    }
-    p.statusCol = p.unitCol + 1;
-  }
-}
-
-// One-letter mark for sheet: I > O > V > '' (Locked/none)
-function statusesToSheetMark(statuses){
-  if (statuses.has('Issue')) return 'I';
-  if (statuses.has('Overlocked')) return 'O';
-  if (statuses.has('Vacant')) return 'V';
-  return '';
-}
-
-// Apply effective statuses to EVERY Status column
-function applyStatusesToSheet(){
-  if (!sheetState.rows) return;
-  ensureStatusColumns(sheetState.rows, sheetState.pairs, sheetState.hasHeader);
-
-  const start = sheetState.hasHeader ? 1 : 0;
-  for (let r = start; r < sheetState.rows.length; r++){
-    for (const p of sheetState.pairs){
-      const unit = parseUnitNumber(sheetState.rows[r][p.unitCol]);
-      if (!Number.isFinite(unit)) continue;
-      ensureUnitRecord(state.dateISO, unit);
-      const statuses = effectiveStatusesForUnit(unit);
-      sheetState.rows[r][p.statusCol] = statusesToSheetMark(statuses);
-    }
-  }
-  renderSheet();
-  $('#sheetStatus').textContent = 'Statuses applied.';
-}
-
-// Render sheet with highlights for unit/status columns
-function renderSheet(){
-  const host = $('#sheetHost');
-  host.innerHTML = '';
-  if (!sheetState.rows) return;
-
-  const table = document.createElement('table');
-  const thead = document.createElement('thead');
-  const tbody = document.createElement('tbody');
-
-  sheetState.rows.forEach((row, ri)=>{
-    const tr = document.createElement('tr');
-    row.forEach((cell, ci)=>{
-      const el = (sheetState.hasHeader && ri===0) ? document.createElement('th') : document.createElement('td');
-      if (sheetState.pairs.some(p=>p.unitCol===ci))   el.style.background = '#f6fbff'; // units
-      if (sheetState.pairs.some(p=>p.statusCol===ci)) el.style.background = '#f9fff6'; // statuses
-      el.textContent = (cell == null ? '' : String(cell));
-      tr.appendChild(el);
-    });
-    if (sheetState.hasHeader && ri===0) thead.appendChild(tr); else tbody.appendChild(tr);
-  });
-
-  if (thead.children.length) table.appendChild(thead);
-  table.appendChild(tbody);
-  host.appendChild(table);
-
-  $('#sheetMeta').textContent =
-    `${sheetState.name||'Sheet'} — ${sheetState.rows.length} rows; pairs: ` +
-    sheetState.pairs.map(p=>`[${p.unitCol+1}/${p.statusCol+1}]`).join(', ');
-}
-
-// Save the sheet to .xlsx
-function saveSheetXLSX(){
-  if (!sheetState.rows) return;
-  const ws = XLSX.utils.aoa_to_sheet(sheetState.rows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, sheetState.name || 'Report');
-  const fname = `report_${state.dateISO}.xlsx`;
-  XLSX.writeFile(wb, fname);
-}
-
-// Print the sheet view (no scaling feature)
-function printSheet(){
-  if (!sheetState.rows){ alert('Load a blueprint first.'); return; }
-  document.getElementById('sheetWrap').style.display = '';
-  window.print();
-}
-
-// Compact contiguous units into ranges
-function compactUnitsToRanges(units){
-  const u = [...new Set(units)].map(Number).filter(Number.isFinite).sort((a,b)=>a-b);
-  const out = []; let s=null, prev=null;
-  for (const n of u){
-    if (s===null){ s=n; prev=n; continue; }
-    if (n === prev+1){ prev=n; continue; }
-    out.push({start:s, end:prev}); s=n; prev=n;
-  }
-  if (s!==null) out.push({start:s, end:prev});
-  return out;
-}
-
-// Simple CSV parser (quote-aware)
-function parseCSV(text){
-  const rows = []; let i=0, field='', row=[], q=false;
-  const pushField = ()=>{ row.push(field); field=''; };
-  const pushRow = ()=>{ rows.push(row); row=[]; };
-  while(i<text.length){
-    const c = text[i];
-    if (q){
-      if (c === '"'){
-        if (text[i+1] === '"'){ field+='"'; i++; }
-        else { q=false; }
-      } else field += c;
-    } else {
-      if (c === '"') q=true;
-      else if (c === ',') pushField();
-      else if (c === '\n'){ pushField(); pushRow(); }
-      else if (c === '\r'){ /* skip */ }
-      else field += c;
-    }
-    i++;
-  }
-  pushField(); pushRow();
-  while (rows.length && rows[rows.length-1].every(v=>String(v||'').trim()==='')) rows.pop();
-  return rows;
-}
-
-// Import .xlsx/.csv blueprint, render, and optionally update carousel ranges
-function importBlueprintFile(file, includeUnits){
-  const name = (file?.name||'').toLowerCase();
-  const finish = (rows, sheetName) => {
-    rows = (rows||[]).map(r => Array.isArray(r) ? r : Array.from(r));
-    while (rows.length && rows[rows.length-1].every(c => String(c??'').trim()==='')) rows.pop();
-
-    const det = detectPairs(rows);
-    sheetState.rows = rows;
-    sheetState.hasHeader = det.hasHeader;
-    sheetState.pairs = det.pairs;
-    sheetState.name = sheetName || 'Sheet';
-
-    ensureStatusColumns(sheetState.rows, sheetState.pairs, sheetState.hasHeader);
-
-    if (includeUnits){
-      const start = sheetState.hasHeader ? 1 : 0;
-      const units = [];
-      for (let r=start; r<rows.length; r++){
-        for (const p of sheetState.pairs){
-          const n = parseUnitNumber(rows[r][p.unitCol]);
-          if (Number.isFinite(n)) units.push(n);
-        }
-      }
-      if (units.length){
-        const newRanges = compactUnitsToRanges(units);
-        setRanges(newRanges);
-        rebuildUnits();
-        buildCarousel();
-        if (getVisibleUnits().length>0) loadUnit(currentUnit());
-      }
-    }
-
-    renderSheet();
-    $('#sheetWrap').style.display = '';
-    $('#sheetStatus').textContent = `Loaded: ${file.name}`;
-    $('#btnApplyStatusesSheet').disabled = false;
-    $('#btnSaveSheet').disabled = false;
-    $('#btnPrintSheet').disabled = false;
-  };
-
-  if (name.endsWith('.csv')){
-    const reader = new FileReader();
-    reader.onload = () => { finish(parseCSV(reader.result), 'CSV'); };
-    reader.readAsText(file);
-    return;
-  }
-
-  // XLSX/XLS
-  if (!window.XLSX){ alert('XLSX library not loaded.'); return; }
-  const reader = new FileReader();
-  reader.onload = () => {
-    const wb = XLSX.read(reader.result, {type:'array'});
-    const sn = wb.SheetNames[0];
-    const ws = wb.Sheets[sn];
-    const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-    finish(rows, sn);
-  };
-  reader.readAsArrayBuffer(file);
-}
-
-/* ========= end Spreadsheet integration ========= */
-
-// Save META (sizes/types) per current unit
-function saveMeta(){
-  const unit = currentUnit();
-  const meta = getMeta();
-  meta[unit] = {
-    sizes: $$('.meta-size').filter(x=>x.checked).map(x=>x.value),
-    types: $$('.meta-type').filter(x=>x.checked).map(x=>x.value),
-  };
-  setMeta(meta);
 }
 
 // Boot
