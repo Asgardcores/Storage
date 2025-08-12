@@ -5,15 +5,20 @@
   --card:#ffffff;
   --text:#0b1620;
   --muted:#8aa4bf;
+
+  /* status colors */
   --ok:#1f8f2e;             /* Locked */
   --vacant:#ffffff;         /* Vacant */
   --overlocked:#b71c1c;     /* Overlocked */
   --issue:#f39c12;          /* Issue (highest priority) */
+
   --shadow:0 2px 8px rgba(0,0,0,.12);
-  --inset-press: inset 0 3px 8px rgba(0,0,0,.28),
-                 inset 0 1px 0 rgba(255,255,255,.45),
-                 inset 0 0 0 1px rgba(0,0,0,.08);
+  --inset-press:
+    inset 0 3px 8px rgba(0,0,0,.28),
+    inset 0 1px 0 rgba(255,255,255,.45),
+    inset 0 0 0 1px rgba(0,0,0,.08);
 }
+
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
 body{
@@ -24,26 +29,27 @@ body{
   touch-action:manipulation;
   overscroll-behavior-y:none;
 }
+
 .app{max-width:900px;margin:0 auto;display:flex;flex-direction:column;min-height:100vh}
 header{position:sticky;top:0;background:var(--card);box-shadow:var(--shadow);z-index:10}
 header .row{display:flex;gap:.5rem;align-items:center;padding:.5rem .75rem;flex-wrap:wrap}
 header .row > *{flex:1}
 h1{font-size:1rem;margin:0;color:var(--steel);letter-spacing:.5px}
+.lastmod{font-size:.85rem;color:#33597f}
 
 .btn{
   display:inline-flex;justify-content:center;align-items:center;
   border:1px solid transparent;border-radius:.75rem;
-  padding:.7rem 1rem;background:var(--steel);color:#fff;font-weight:600;
-  box-shadow:var(--shadow);cursor:pointer;
-  transition: background .15s ease, color .15s ease, border-color .15s ease
+  padding:.7rem 1rem;background:var(--steel);color:#fff;
+  font-weight:600;box-shadow:var(--shadow);cursor:pointer;
+  transition: background .15s ease, color .15s ease, border-color .15s ease, transform .05s ease;
 }
+.btn:active{transform:translateY(1px)}
 .btn.secondary{background:#e9f0f8;color:var(--steel);font-weight:700}
 .btn.ghost{background:transparent;color:var(--steel);box-shadow:none;border:2px solid var(--steel)}
 
 .toolbar{display:flex;gap:.5rem}
-input[type="date"], select{
-  width:100%;padding:.65rem;border-radius:.6rem;border:1px solid #c9d6e6;background:#fff;color:var(--text)
-}
+input[type="date"], select{width:100%;padding:.65rem;border-radius:.6rem;border:1px solid #c9d6e6;background:#fff;color:var(--text)}
 
 main{flex:1;display:flex;flex-direction:column;gap:.75rem;padding:.75rem}
 
@@ -56,8 +62,8 @@ main{flex:1;display:flex;flex-direction:column;gap:.75rem;padding:.75rem}
 }
 .carousel::-webkit-scrollbar{display:none}
 .unit-pill{
-  position:relative;flex:0 0 auto;min-width:52px;aspect-ratio:1/1;
-  border-radius:.6rem;background:#e8eef6;display:flex;align-items:center;justify-content:center;
+  position:relative;flex:0 0 auto;min-width:52px;aspect-ratio:1/1;border-radius:.6rem;
+  background:#e8eef6;display:flex;align-items:center;justify-content:center;
   font-weight:700;color:#244a72;border:2px solid transparent;
   box-shadow: inset 0 2px 0 rgba(255,255,255,.35), inset 0 -2px 0 rgba(0,0,0,.18);
   scroll-snap-align:center
@@ -68,6 +74,7 @@ main{flex:1;display:flex;flex-direction:column;gap:.75rem;padding:.75rem}
 .unit-pill .badge.multi{top:.2rem;right:.25rem;color:#0b2239}
 .unit-pill .badge.note{bottom:.2rem;left:.25rem;color:#0b2239}
 
+/* Cards & sections */
 .panels{display:grid;grid-template-columns:1fr;gap:.75rem}
 @media(min-width:720px){.panels{grid-template-columns:1.2fr .8fr}}
 .card{background:var(--card);border-radius:1rem;box-shadow:var(--shadow);padding:1rem;position:relative}
@@ -88,60 +95,76 @@ main{flex:1;display:flex;flex-direction:column;gap:.75rem;padding:.75rem}
 .legend-pill{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .55rem;border-radius:.7rem;background:#eef4fb}
 .swatch{width:.9rem;height:.9rem;border-radius:.2rem;border:1px solid #9db2c8}
 
-/* Hide the Preview & Meta card entirely */
+/* Preview & Meta — hidden per your request */
 #previewCard{display:none !important}
 
-/* Image frames (kept for future use) */
-.images-and-meta{display:grid;grid-template-columns:auto 1fr;gap:.75rem;align-items:start}
-.meta-checks{display:grid;gap:.25rem}
-.meta-group{background:#eef4fb;border:1px solid #c5d6ea;border-radius:.6rem;padding:.35rem .5rem}
-.meta-group h4{margin:.2rem 0 .35rem;font-size:.8rem;color:#31567a}
-.meta-group .row{display:flex;gap:.35rem;flex-wrap:wrap}
-.meta-group label{display:flex;align-items:center;gap:.35rem;font-size:.85rem}
-.image-strip{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem}
-.image-frame{position:relative;border:2px solid transparent;border-radius:.6rem;overflow:hidden;background:#e9eef5;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center}
-.image-frame.center{border-color:#2b66a0}
-.image-frame img{max-width:100%;width:100%;height:100%;object-fit:cover}
-
-textarea, input[type="text"], input[type="tel"]{width:100%;padding:.7rem;border:1px solid #c9d6e6;border-radius:.6rem;background:#fff}
+/* Inputs */
+textarea, input[type="text"], input[type="tel"]{
+  width:100%;padding:.7rem;border:1px solid #c9d6e6;border-radius:.6rem;background:#fff
+}
 textarea{min-height:88px;resize:vertical}
 .contact-info{display:grid;gap:.5rem}
 .contact-row{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
-/* Hide the Note field under contact info if desired later: */
-/* #contactNote{display:none !important} */
+/* Hide the extra note under contacts */
+#contactNote{display:none !important}
 
+/* Mini current box */
 .mini-current{margin-top:.5rem;display:flex;gap:.5rem;align-items:center}
-.mini-box{min-width:52px;aspect-ratio:1/1;border-radius:.6rem;background:#e8eef6;display:flex;align-items:center;justify-content:center;font-weight:800;color:#244a72;border:2px solid #2b66a0;position:relative}
+.mini-box{
+  min-width:52px;aspect-ratio:1/1;border-radius:.6rem;background:#e8eef6;
+  display:flex;align-items:center;justify-content:center;font-weight:800;color:#244a72;
+  border:2px solid #2b66a0;position:relative
+}
 .mini-box .badge{position:absolute;font-size:.75rem}
 .mini-box .badge.dot{top:.2rem;left:.25rem;width:.5rem;height:.5rem;border-radius:999px;background:#2b66a0}
 .mini-box .badge.multi{top:.2rem;right:.25rem}
 .mini-box .badge.note{bottom:.2rem;left:.25rem}
 
-/* Sticky, full-width, mobile-friendly nav buttons */
+/* Sticky bottom nav with skip-10 buttons */
 .nav-bottom{
-  position:sticky;
-  bottom:0; left:0; right:0;
-  display:grid; grid-template-columns:1fr 1fr; gap:.75rem;
-  padding:.75rem .75rem calc(.75rem + env(safe-area-inset-bottom));
-  background:linear-gradient(180deg, rgba(244,246,248,.9), rgba(244,246,248,1));
-  backdrop-filter:saturate(135%) blur(6px);
-  -webkit-backdrop-filter:saturate(135%) blur(6px);
-  z-index:100;
+  position:sticky;bottom:0;
+  display:grid;grid-template-columns:1fr 2fr 2fr 1fr;gap:.5rem;
+  padding:.65rem .75rem;
+  background:linear-gradient(180deg, rgba(244,246,248,.8), rgba(244,246,248,1));
+  box-shadow:0 -3px 8px rgba(0,0,0,.06)
 }
-.nav-bottom .btn{
-  width:100%;
-  min-height:56px;              /* large touch target */
-  font-size:1.1rem;
-  padding:1rem;
-  border-radius:1rem;
+.nav-bottom .btn{width:100%}
+
+/* Main prev/next: more squared, a little less padding */
+#btnPrev, #btnNext{
+  border-radius:.5rem;
+  padding:.9rem .5rem;
+  font-size:1.05rem;
   font-weight:800;
 }
 
-@media (max-width:420px){
-  .nav-bottom .btn{min-height:60px;font-size:1.15rem}
+/* Skip-10 chevrons: same height, compact width, bold glyph */
+#btnPrev10, #btnNext10{
+  border-radius:.5rem;
+  padding:.9rem 0;
+  font-size:1.1rem;
+  font-weight:900;
+  background:#e9f0f8;
+  color:#244a72;
+  border:2px solid #c9d6e6;
+}
+#btnPrev10:active, #btnNext10:active{transform:translateY(1px)}
+
+/* If you ever render without skip buttons, this keeps 2-button layout tidy */
+@supports not (grid-template-columns:subgrid){
+  .nav-bottom:has(#btnPrev):has(#btnNext):not(:has(#btnPrev10)):not(:has(#btnNext10)){
+    grid-template-columns:1fr 1fr;
+  }
 }
 
-/* Ranges / Menu Drawer */
+/* Filter chip in the top-right of Statuses card */
+.filter-chip{
+  position:absolute;top:1rem;right:1rem;font-size:.8rem;
+  padding:.35rem .6rem;border-radius:.6rem
+}
+.filter-chip[data-on="true"]{background:var(--steel);color:#fff;border-color:var(--steel)}
+
+/* Drawer / Ranges */
 .drawer{position:fixed;inset:0;display:none}
 .drawer[open]{display:block}
 .drawer .shade{position:absolute;inset:0;background:rgba(0,0,0,.35)}
@@ -155,18 +178,16 @@ textarea{min-height:88px;resize:vertical}
 .range-item input{padding:.55rem}
 .icon-btn{border:none;background:#edf3fa;border-radius:.6rem;padding:.45rem .55rem;font-weight:800;color:#244a72}
 
-/* Report page */
+/* Report */
 .report{display:none}
 .report[active]{display:block}
 .filters{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem}
-.toggle{padding:.45rem .7rem;border-radius:.8rem;border:2px solid var(--steel);color:var(--steel);background:#fff;font-weight:700}
+.toggle{
+  padding:.45rem .7rem;border-radius:.8rem;border:2px solid var(--steel);
+  color:var(--steel);background:#fff;font-weight:700
+}
 .toggle[data-on="true"]{background:var(--steel);color:#fff}
 table{width:100%;border-collapse:collapse;background:#fff;border-radius:.8rem;overflow:hidden}
 th,td{padding:.6rem;border-bottom:1px solid #e4ecf6;text-align:left;vertical-align:top}
 thead th{background:#eef4fb;color:#234a73}
 .muted{color:#6c86a3}
-.lastmod{font-size:.85rem;color:#33597f}
-
-/* Filter chip on Status card */
-.filter-chip{position:absolute;top:1rem;right:1rem;font-size:.8rem;padding:.35rem .6rem}
-.filter-chip[data-on="true"]{background:var(--steel);color:#fff;border-color:var(--steel)}

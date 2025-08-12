@@ -216,6 +216,20 @@ function prevUnit(){
   if (state.idx > 0){ state.idx--; loadUnit(currentUnit()); highlightActivePill(); centerActive(); }
 }
 
+function skipUnitsBy(delta){
+  flushCurrentEdits();
+  const vis = getVisibleUnits();
+  if (!vis.length) return;
+  // clamp to bounds, move up to 10 steps at a time
+  const step = Math.max(-10, Math.min(10, delta));
+  const idx = Math.max(0, Math.min(state.idx + step, vis.length - 1));
+  state.idx = idx;
+  loadUnit(currentUnit());
+  highlightActivePill();
+  centerActive();
+}
+
+
 /****************
  * Data Binding  *
  ***************/
@@ -376,6 +390,9 @@ function bindInputs(){
   // nav
   $('#btnNext')?.addEventListener('click', nextUnit);
   $('#btnPrev')?.addEventListener('click', prevUnit);
+$('#btnNext10').addEventListener('click', ()=>skipUnitsBy(10));
+$('#btnPrev10').addEventListener('click', ()=>skipUnitsBy(-10));
+
 
   // date
   $('#datePicker')?.addEventListener('change', ()=>{
