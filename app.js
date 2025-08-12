@@ -8,7 +8,7 @@ const fmtUS = (d) => {
   if (!d) return '';
   const dt = new Date(d);
   const mm = String(dt.getMonth()+1).padStart(2,'0');
-  const dd = String(dt.getDate()).padStart(2,'0');
+  const dd = String(dt.getDate()).slice(-2);
   const yy = String(dt.getFullYear()).slice(-2);
   return `${mm}/${dd}/${yy} ${dt.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
 };
@@ -20,6 +20,12 @@ const LS = {
   FORWARD: 'sst_forward_v1',
   STATUS_FWD: 'sst_status_forward_v1',
   DATE_DATA_PREFIX: 'sst_date_',
+};
+
+// Emit a cross-file event whenever local data is saved.
+// Call this right after you write to localStorage.
+window.sstEmitChange = (kind, detail={}) => {
+  window.dispatchEvent(new CustomEvent('sst:changed', { detail: { kind, ...detail } }));
 };
 
 const getRanges = () => JSON.parse(localStorage.getItem(LS.RANGES) || '[]');
@@ -240,6 +246,7 @@ function ensureUnitRecord(iso, unit){
     const statusFwd = getStatusForward()[unit] || [];
     data[unit] = { statuses: [...statusFwd], comment: fwd.comment || '', name: fwd.name||'', phone: fwd.phone||'', note: fwd.note||'', lastModified: null, history: [] };
     setDateData(iso, data);
+    // (No emit here to avoid noisy events during initial loads)
   }
   return getDateData(iso)[unit];
 }
@@ -291,11 +298,13 @@ function saveUnitChange(unit, updater){
     rec.history.push({ t: rec.lastModified, data: { statuses:[...new Set(rec.statuses||[])], comment:rec.comment||'', name:rec.name||'', phone:rec.phone||'', note:rec.note||'' } });
     all[unit] = rec;
     setDateData(iso, all);
+    window.sstEmitChange('date', { date: iso, unit });
 
     // persist-forward statuses
     const sf = getStatusForward();
     sf[unit] = [...new Set(rec.statuses||[])];
     setStatusForward(sf);
+    window.sstEmitChange('statusForward', { unit });
 
     updateForwardFrom(rec, unit);
     updateLastUpdatedLabel();
@@ -307,6 +316,7 @@ function updateForwardFrom(rec, unit){
   const prev = fwd[unit] || {};
   fwd[unit] = { comment: rec.comment || prev.comment || '', name: rec.name || prev.name || '', phone: rec.phone || prev.phone || '', note: rec.note || prev.note || '' };
   setForward(fwd);
+  window.sstEmitChange('forward', { unit });
 }
 
 function renderHistoryPreview(history){
@@ -390,9 +400,8 @@ function bindInputs(){
   // nav
   $('#btnNext')?.addEventListener('click', nextUnit);
   $('#btnPrev')?.addEventListener('click', prevUnit);
-$('#btnNext10').addEventListener('click', ()=>skipUnitsBy(10));
-$('#btnPrev10').addEventListener('click', ()=>skipUnitsBy(-10));
-
+  $('#btnNext10').addEventListener('click', ()=>skipUnitsBy(10));
+  $('#btnPrev10').addEventListener('click', ()=>skipUnitsBy(-10));
 
   // date
   $('#datePicker')?.addEventListener('change', ()=>{
@@ -483,7 +492,7 @@ $('#btnPrev10').addEventListener('click', ()=>skipUnitsBy(-10));
   $('#btnClearCommentFuture')?.addEventListener('click', ()=>{
     const unit = currentUnit(); if (unit==null) return;
     const fwd = getForward();
-    if (fwd[unit]){ fwd[unit].comment = ''; setForward(fwd); }
+    if (fwd[unit]){ fwd[unit].comment = ''; setForward(fwd); window.sstEmitChange('forward', { unit }); }
     const rec = ensureUnitRecord(state.dateISO, unit);
     if (!rec.comment){ const c = $('#comment'); if (c) c.placeholder = 'Comment (persists forward to future dates)'; }
     reflectCarouselBadges(); updateReport();
@@ -509,6 +518,7 @@ function saveMeta(){
     types: $$('.meta-type').filter(x=>x.checked).map(x=>x.value),
   };
   setMeta(meta);
+  window.sstEmitChange('meta', { unit });
 }
 
 /***********
@@ -611,6 +621,7 @@ function saveRanges(){
   const ranges = rows.map(r=>({ start:Number(r.children[0].value||0), end:Number(r.children[1].value||0) }))
                      .filter(x=>Number.isFinite(x.start) && Number.isFinite(x.end));
   setRanges(ranges);
+  window.sstEmitChange('ranges');
   rebuildUnits();
   buildCarousel();
   if (getVisibleUnits().length>0) loadUnit(currentUnit());
@@ -623,6 +634,7 @@ function addRangeRow(){
   const start = last ? Number(last.end)+1 : 1;
   ranges.push({start, end:start+9});
   setRanges(ranges);
+  window.sstEmitChange('ranges');
   renderRangeList();
   rebuildUnits();
   buildCarousel();
@@ -853,6 +865,7 @@ function importBlueprintFile(file, includeUnits){
       if (units.length){
         const newRanges = compactUnitsToRanges(units);
         setRanges(newRanges);
+        window.sstEmitChange('ranges');
         rebuildUnits();
         buildCarousel();
         if (getVisibleUnits().length>0) loadUnit(currentUnit());
