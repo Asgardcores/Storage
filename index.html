@@ -2,14 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, user-scalable=no"
+  />
   <title>Self Storage Tracker</title>
 
-  <!-- PWA -->
-  <link rel="manifest" href="./manifest.json" />
+  <!-- PWA basics -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Self Storage Tracker" />
 
-  <link rel="stylesheet" href="./app.css" />
-  <!-- SheetJS (optional; remove if you don't need .xlsx import/export) -->
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="app.css" />
+  <!-- SheetJS for .xlsx import/export -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
@@ -35,6 +41,7 @@
       <section class="panels">
         <div class="card">
           <h3 class="section-title">Statuses</h3>
+          <!-- Overlocked filter in top-right -->
           <button class="btn ghost filter-chip" id="toggleOverlockedFilter"
                   aria-pressed="false" data-on="false"
                   title="Show only units that are Overlocked">
@@ -51,8 +58,8 @@
           </div>
         </div>
 
-        <!-- (Preview card can stay hidden by CSS if you’re not using it) -->
-        <div class="card" id="previewCard" style="display:none">
+        <!-- Preview & Meta (hidden by CSS, kept for future) -->
+        <div class="card" id="previewCard">
           <h3 class="section-title">Preview & Meta</h3>
           <div class="images-and-meta">
             <div class="meta-checks">
@@ -101,6 +108,7 @@
               <input type="text" id="contactName" placeholder="Name" />
               <input type="tel" id="contactPhone" placeholder="Phone" />
             </div>
+            <!-- Hidden by CSS per your request -->
             <textarea id="contactNote" placeholder="Note..."></textarea>
           </div>
         </div>
@@ -124,7 +132,40 @@
       <section id="reportPage" class="report card">
         <h3 class="section-title">Report</h3>
 
-        <!-- (Spreadsheet controls are optional; print-scale removed) -->
+        <!-- Spreadsheet toolbar (restored) -->
+        <div class="sheet-io" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin:.5rem 0">
+          <input type="file" id="blueprintFile" accept=".xlsx,.xls,.csv" hidden />
+          <button class="btn secondary" id="btnBlueprintImport">Import blueprint</button>
+
+          <label class="opt" title="Use units in the sheet to rebuild the carousel ranges">
+            <input type="checkbox" id="optIncludeUnitsSheet" checked />
+            Include units → carousel
+          </label>
+
+          <span class="muted" id="sheetStatus">No sheet loaded.</span>
+          <span style="flex:1"></span>
+
+          <button class="btn secondary" id="btnApplyStatusesSheet" disabled>Apply statuses</button>
+          <button class="btn secondary" id="btnSaveSheet" disabled>Save .xlsx</button>
+          <button class="btn" id="btnPrintSheet" disabled>Print</button>
+        </div>
+
+        <!-- Spreadsheet preview -->
+        <div id="sheetWrap" style="display:none">
+          <div id="sheetMeta" class="muted" style="margin:.25rem 0 .5rem"></div>
+          <div id="sheetPrintFit">
+            <div id="sheetHost" class="sheet-host"></div>
+          </div>
+        </div>
+
+        <!-- Fallback table report -->
+        <div class="filters">
+          <button class="toggle" data-key="Locked" data-on="true">Locked</button>
+          <button class="toggle" data-key="Vacant" data-on="true">Vacant</button>
+          <button class="toggle" data-key="Overlocked" data-on="true">Overlocked</button>
+          <button class="toggle" data-key="Issue" data-on="true">Issue</button>
+          <button class="toggle" id="toggleModifiedToday" data-on="false">Modified Today</button>
+        </div>
         <div class="muted" style="margin-bottom:.25rem">Shows units unless ONLY Locked with no comment. Updates automatically.</div>
         <table id="reportTable">
           <thead>
@@ -143,21 +184,82 @@
   </div>
 
   <!-- Ranges Drawer -->
-  <dialog id="rangesDrawer" class="drawer" role="dialog" aria-modal="true">
+  <dialog id="rangesDrawer" class="drawer">
     <div class="shade" data-close></div>
     <div class="panel">
-      <div class="drawer-head">
-        <h3 class="section-title">Unit Ranges</h3>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem">
+        <h3 class="section-title" style="margin:0">Unit Ranges</h3>
         <button class="btn ghost" data-close>Close</button>
       </div>
+
       <div class="range-list" id="rangeList"></div>
-      <div class="drawer-actions">
+
+      <div style="margin-top:.75rem;display:flex;gap:.5rem">
         <button class="btn" id="addRange">Add Range</button>
         <button class="btn secondary" id="clearAllData">Clear ALL Data</button>
+      </div>
+
+      <!-- Theme / Colors -->
+      <div class="meta-group" style="margin-top:1rem">
+        <h4>Theme Colors</h4>
+        <div class="row" style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <label>Accent
+            <input type="color" id="colorSteel" value="#3a6ea5" />
+          </label>
+          <label>Locked
+            <input type="color" id="colorOk" value="#1f8f2e" />
+          </label>
+          <label>Overlocked
+            <input type="color" id="colorOverlocked" value="#b71c1c" />
+          </label>
+          <label>Issue
+            <input type="color" id="colorIssue" value="#f39c12" />
+          </label>
+        </div>
+        <div class="muted" style="margin-top:.35rem">These save to this device only.</div>
       </div>
     </div>
   </dialog>
 
-  <script defer src="./app.js"></script>
+  <!-- App -->
+  <script defer src="app.js"></script>
+
+  <!-- Tiny helper just for color pickers (safe to keep inline) -->
+  <script>
+    (function(){
+      const KEY = 'sst_colors_v1';
+      const root = document.documentElement;
+      const load = () => {
+        try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { return {}; }
+      };
+      const save = (obj) => localStorage.setItem(KEY, JSON.stringify(obj));
+      const apply = (cfg) => {
+        if (cfg.steel)       root.style.setProperty('--steel', cfg.steel);
+        if (cfg.ok)          root.style.setProperty('--ok', cfg.ok);
+        if (cfg.overlocked)  root.style.setProperty('--overlocked', cfg.overlocked);
+        if (cfg.issue)       root.style.setProperty('--issue', cfg.issue);
+        // refresh UI that uses those vars (if app.js loaded)
+        try { window.reflectCarouselBadges && reflectCarouselBadges(); } catch(e){}
+        try { window.wireStatusLegend && wireStatusLegend(); } catch(e){}
+      };
+      const cfg = load();
+      // init pickers
+      const q = id => document.getElementById(id);
+      if (cfg.steel) q('colorSteel').value = cfg.steel;
+      if (cfg.ok) q('colorOk').value = cfg.ok;
+      if (cfg.overlocked) q('colorOverlocked').value = cfg.overlocked;
+      if (cfg.issue) q('colorIssue').value = cfg.issue;
+      apply(cfg);
+      // bind
+      [['colorSteel','steel'], ['colorOk','ok'], ['colorOverlocked','overlocked'], ['colorIssue','issue']]
+        .forEach(([id,key])=>{
+          const el = q(id); if (!el) return;
+          el.addEventListener('input', ()=>{
+            const next = Object.assign(load(), { [key]: el.value });
+            save(next); apply(next);
+          });
+        });
+    })();
+  </script>
 </body>
 </html>

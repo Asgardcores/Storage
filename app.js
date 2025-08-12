@@ -19,7 +19,7 @@ const LS = {
   META: 'sst_unit_meta_v1',
   FORWARD: 'sst_forward_v1',
   STATUS_FWD: 'sst_status_forward_v1',
-  DATE_DATA_PREFIX: 'sst_date_'
+  DATE_DATA_PREFIX: 'sst_date_',
 };
 
 const getRanges = () => JSON.parse(localStorage.getItem(LS.RANGES) || '[]');
@@ -65,6 +65,22 @@ function effectiveStatusesForUnit(n){
   return new Set(fwd[n] || []);
 }
 
+// Tiny colored chips for report table (inline styles = no CSS changes needed)
+function statusBlocksHTML(statuses){
+  const order = ['Issue','Overlocked','Locked','Vacant'];
+  const color = {
+    Issue: 'var(--issue)',
+    Overlocked: 'var(--overlocked)',
+    Locked: 'var(--ok)',
+    Vacant: '#ffffff'
+  };
+  const have = order.filter(k => statuses.has(k));
+  if (!have.length) return '<span class="muted">—</span>';
+  return '<div class="status-cell" style="display:flex;gap:4px;align-items:center">' +
+         have.map(k => `<span title="${k}" aria-label="${k}" style="display:inline-block;width:14px;height:14px;border-radius:3px;background:${color[k]};border:1px solid rgba(0,0,0,.15)"></span>`).join('') +
+         '</div>';
+}
+
 // Global state
 const state = {
   dateISO: todayISO(),
@@ -77,21 +93,12 @@ const state = {
  * Initialization *
  ***************/
 function init(){
-  if (getRanges().length === 0) setRanges([{start:1,end:80}]);
-
-  const dp = $('#datePicker');
-  if (dp) dp.value = state.dateISO;
-
+  if (getRanges().length === 0){ setRanges([{start:1,end:80}]); }
+  const dp = $('#datePicker'); if (dp) dp.value = state.dateISO;
   rebuildUnits();
   buildCarousel();
   wireStatusLegend();
-
-  if (getVisibleUnits().length>0){
-    loadUnit(currentUnit());
-  }else{
-    const h = $('#history'); if (h) h.textContent = 'No history yet.';
-  }
-
+  if (getVisibleUnits().length>0) loadUnit(currentUnit());
   updateReport();
   updateLastUpdatedLabel();
   bindInputs();
@@ -131,7 +138,6 @@ function getVisibleUnits(){
 
 function buildCarousel(){
   const car = $('#carousel');
-  if (!car) return;
   const arr = getVisibleUnits();
   car.innerHTML = '';
   if (arr.length === 0){
@@ -182,7 +188,6 @@ function highlightActivePill(){
 
 function centerActive(){
   const car = $('#carousel');
-  if (!car) return;
   const n = currentUnit();
   const pill = car.querySelector(`.unit-pill[data-unit="${n}"]`);
   if (pill){ pill.scrollIntoView({block:'nearest', inline:'center'}); }
@@ -331,25 +336,28 @@ function bindInputs(){
 
   // comment (debounce + blur)
   const cmt = $('#comment');
-  cmt.addEventListener('input', ()=>{
-    clearTimeout(commentTimer);
-    commentTimer = setTimeout(()=>{
+  if (cmt){
+    cmt.addEventListener('input', ()=>{
+      clearTimeout(commentTimer);
+      commentTimer = setTimeout(()=>{
+        const unit = currentUnit(); if (unit==null) return;
+        saveUnitChange(unit, rec => { rec.comment = $('#comment').value; });
+        reflectCarouselBadges(); updateReport();
+        if (state.overlockedOnly) buildCarousel();
+      }, 800);
+    });
+    cmt.addEventListener('blur', ()=>{
       const unit = currentUnit(); if (unit==null) return;
       saveUnitChange(unit, rec => { rec.comment = $('#comment').value; });
       reflectCarouselBadges(); updateReport();
       if (state.overlockedOnly) buildCarousel();
-    }, 800);
-  });
-  cmt.addEventListener('blur', ()=>{
-    const unit = currentUnit(); if (unit==null) return;
-    saveUnitChange(unit, rec => { rec.comment = $('#comment').value; });
-    reflectCarouselBadges(); updateReport();
-    if (state.overlockedOnly) buildCarousel();
-  });
+    });
+  }
 
   // contacts
   ['contactName','contactPhone','contactNote'].forEach(id=>{
     const el = $('#'+id);
+    if (!el) return;
     el.addEventListener('blur', ()=>{
       const unit = currentUnit(); if (unit==null) return;
       saveUnitChange(unit, rec => {
@@ -361,17 +369,17 @@ function bindInputs(){
     });
   });
 
-  // meta (wired but optional)
+  // meta
   $$('.meta-size').forEach(ch=> ch.addEventListener('change', saveMeta));
   $$('.meta-type').forEach(ch=> ch.addEventListener('change', saveMeta));
 
   // nav
-  $('#btnNext').addEventListener('click', nextUnit);
-  $('#btnPrev').addEventListener('click', prevUnit);
+  $('#btnNext')?.addEventListener('click', nextUnit);
+  $('#btnPrev')?.addEventListener('click', prevUnit);
 
   // date
-  $('#datePicker').addEventListener('change', ()=>{
-    flushCurrentEdits();
+  $('#datePicker')?.addEventListener('change', ()=>{
+    flushCurrentEdits?.();
     state.dateISO = $('#datePicker').value || todayISO();
     buildCarousel();
     const vis = getVisibleUnits();
@@ -390,7 +398,7 @@ function bindInputs(){
   });
 
   // report toggle
-  $('#btnReport').addEventListener('click', ()=>{
+  $('#btnReport')?.addEventListener('click', ()=>{
     const page = $('#reportPage'); if (!page) return;
     page.toggleAttribute('active');
     if (page.hasAttribute('active')){ updateReport(); page.scrollIntoView({behavior:'smooth'}); }
@@ -405,10 +413,10 @@ function bindInputs(){
   });
 
   // ranges
-  $('#btnRanges').addEventListener('click', openRanges);
+  $('#btnRanges')?.addEventListener('click', openRanges);
   $$('#rangesDrawer [data-close]').forEach(el=> el.addEventListener('click', closeRanges));
-  $('#addRange').addEventListener('click', addRangeRow);
-  $('#clearAllData').addEventListener('click', ()=>{
+  $('#addRange')?.addEventListener('click', addRangeRow);
+  $('#clearAllData')?.addEventListener('click', ()=>{
     if (confirm('This will remove ALL saved data, ranges, meta, and forward fields. Continue?')){
       localStorage.clear(); location.reload();
     }
@@ -416,31 +424,33 @@ function bindInputs(){
 
   // overlocked filter
   const filtBtn = $('#toggleOverlockedFilter');
-  filtBtn.addEventListener('click', ()=>{
-    flushCurrentEdits();
-    const curr = currentUnit();
-    state.overlockedOnly = !state.overlockedOnly;
-    filtBtn.dataset.on = String(state.overlockedOnly);
-    filtBtn.setAttribute('aria-pressed', state.overlockedOnly ? 'true' : 'false');
-    const vis = getVisibleUnits();
-    state.idx = Math.max(0, vis.indexOf(curr));
-    buildCarousel();
-    if (vis.length > 0){
-      if (state.idx < 0) state.idx = 0;
-      loadUnit(currentUnit());
-    } else {
-      const h = $('#history'); if (h) h.textContent = 'No history yet.';
-      const mn = $('#miniNum'); if (mn) mn.textContent = '—';
-      $('#miniMulti')?.setAttribute('hidden','');
-      $('#miniNote')?.setAttribute('hidden','');
-      $('#miniDot')?.setAttribute('hidden','');
-    }
-    highlightActivePill();
-    centerActive();
-  });
+  if (filtBtn){
+    filtBtn.addEventListener('click', ()=>{
+      flushCurrentEdits?.();
+      const curr = currentUnit();
+      state.overlockedOnly = !state.overlockedOnly;
+      filtBtn.dataset.on = String(state.overlockedOnly);
+      filtBtn.setAttribute('aria-pressed', state.overlockedOnly ? 'true' : 'false');
+      const vis = getVisibleUnits();
+      state.idx = Math.max(0, vis.indexOf(curr));
+      buildCarousel();
+      if (vis.length > 0){
+        if (state.idx < 0) state.idx = 0;
+        loadUnit(currentUnit());
+      } else {
+        const h = $('#history'); if (h) h.textContent = 'No history yet.';
+        const mn = $('#miniNum'); if (mn) mn.textContent = '—';
+        $('#miniMulti')?.setAttribute('hidden','');
+        $('#miniNote')?.setAttribute('hidden','');
+        $('#miniDot')?.setAttribute('hidden','');
+      }
+      highlightActivePill();
+      centerActive();
+    });
+  }
 
   // history
-  $('#btnViewHistory').addEventListener('click', ()=>{
+  $('#btnViewHistory')?.addEventListener('click', ()=>{
     const unit = currentUnit(); if (unit==null) return;
     const rec = ensureUnitRecord(state.dateISO, unit);
     const lines = (rec.history||[]).map(h=>{
@@ -453,7 +463,7 @@ function bindInputs(){
       : 'No history yet.');
   });
 
-  $('#btnClearCommentFuture').addEventListener('click', ()=>{
+  $('#btnClearCommentFuture')?.addEventListener('click', ()=>{
     const unit = currentUnit(); if (unit==null) return;
     const fwd = getForward();
     if (fwd[unit]){ fwd[unit].comment = ''; setForward(fwd); }
@@ -461,6 +471,17 @@ function bindInputs(){
     if (!rec.comment){ const c = $('#comment'); if (c) c.placeholder = 'Comment (persists forward to future dates)'; }
     reflectCarouselBadges(); updateReport();
   });
+
+  /* ===== Spreadsheet toolbar wiring ===== */
+  $('#btnBlueprintImport')?.addEventListener('click', ()=> $('#blueprintFile')?.click());
+  $('#blueprintFile')?.addEventListener('change', (e)=>{
+    const f = e.target.files?.[0];
+    if (f) importBlueprintFile(f, $('#optIncludeUnitsSheet')?.checked ?? true);
+    e.target.value='';
+  });
+  $('#btnApplyStatusesSheet')?.addEventListener('click', applyStatusesToSheet);
+  $('#btnSaveSheet')?.addEventListener('click', saveSheetXLSX);
+  $('#btnPrintSheet')?.addEventListener('click', printSheet);
 }
 
 function saveMeta(){
@@ -474,7 +495,7 @@ function saveMeta(){
 }
 
 /***********
- * Report (fallback table)
+ * Report (table)
  **********/
 function updateReport(){
   const tbody = $('#reportTable tbody');
@@ -510,7 +531,7 @@ function updateReport(){
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${n}</strong>${ (statuses.size>1) ? ' <span title="Multiple statuses">†</span>':'' }${ comment ? ' <span title="Has comment">*</span>':'' }</td>
-      <td>${[...statuses].join(', ') || '<span class="muted">—</span>'}</td>
+      <td>${statusBlocksHTML(statuses)}</td>
       <td>${comment || '<span class="muted">—</span>'}</td>
       <td>${namePhone || '<span class="muted">—</span>'}</td>
       <td>${rec.lastModified ? fmtUS(rec.lastModified) : '<span class="muted">—</span>'}</td>`;
@@ -543,6 +564,7 @@ function closeRanges(){ $('#rangesDrawer').removeAttribute('open'); }
 
 function renderRangeList(){
   const list = $('#rangeList');
+  if (!list) return;
   list.innerHTML = '';
   const ranges = getRanges();
   ranges.forEach((r, idx)=>{
@@ -567,6 +589,7 @@ function renderRangeList(){
 
 function saveRanges(){
   const list = $('#rangeList');
+  if (!list) return;
   const rows = Array.from(list.children);
   const ranges = rows.map(r=>({ start:Number(r.children[0].value||0), end:Number(r.children[1].value||0) }))
                      .filter(x=>Number.isFinite(x.start) && Number.isFinite(x.end));
@@ -598,6 +621,255 @@ function setupPWA(){
     navigator.serviceWorker.register('sw.js').catch(()=>{});
   }
 }
+
+/* ========= Spreadsheet (Blueprint) integration ========= */
+const sheetState = {
+  rows: null,     // 2D array (AOA)
+  hasHeader: true,
+  name: null,
+  pairs: []       // [{unitCol, statusCol}]
+};
+
+// Parse a unit number from any cell
+function parseUnitNumber(v){
+  const m = String(v ?? '').match(/\d+/);
+  return m ? Number(m[0]) : NaN;
+}
+
+// Find (Unit, Status) column pairs
+function detectPairs(rows){
+  const hdr = rows[0] || [];
+  const lower = hdr.map(v => String(v ?? '').toLowerCase().trim());
+  const unitNames = ['unit','#','unit #','unit number','unitno','unit id','numbers','number'];
+  const statusNames = ['status','statuses','state'];
+
+  let hasHeader = lower.some(h => unitNames.includes(h) || statusNames.includes(h));
+  const pairs = [];
+
+  if (hasHeader){
+    for (let i=0; i<lower.length; i++){
+      if (unitNames.includes(lower[i])){
+        pairs.push({ unitCol: i, statusCol: i + 1 });
+      }
+    }
+  }
+
+  if (pairs.length === 0){
+    hasHeader = false;
+    const rowsToScan = rows.slice(0, Math.min(rows.length, 50));
+    const ncols = Math.max(0, ...rowsToScan.map(r => r.length));
+    const unitScore = new Array(ncols).fill(0);
+    for (const r of rowsToScan){
+      for (let c=0; c<ncols; c++){
+        if (Number.isFinite(parseUnitNumber(r[c]))) unitScore[c]++;
+      }
+    }
+    for (let c=0; c<ncols; c++){
+      if (unitScore[c] >= Math.max(3, rowsToScan.length * 0.5)){
+        pairs.push({ unitCol: c, statusCol: c + 1 });
+      }
+    }
+  }
+
+  for (const p of pairs){ p.statusCol = p.unitCol + 1; }
+  return { hasHeader, pairs };
+}
+
+// Ensure a writable Status column for each pair
+function ensureStatusColumns(rows, pairs, hasHeader){
+  const ensureLen = (row, len) => { while (row.length < len) row.push(''); };
+  if (rows.length === 0) rows.push([]);
+
+  for (const p of pairs){
+    const need = p.unitCol + 2;
+    ensureLen(rows[0], need);
+    if (hasHeader){
+      rows[0][p.unitCol]   = rows[0][p.unitCol]   || 'Unit';
+      rows[0][p.unitCol+1] = rows[0][p.unitCol+1] || 'S'; // one-letter marks
+    }
+    for (let r = hasHeader ? 1 : 0; r < rows.length; r++){
+      ensureLen(rows[r], need);
+    }
+    p.statusCol = p.unitCol + 1;
+  }
+}
+
+// One-letter mark for sheet: I > O > V > '' (Locked/none)
+function statusesToSheetMark(statuses){
+  if (statuses.has('Issue')) return 'I';
+  if (statuses.has('Overlocked')) return 'O';
+  if (statuses.has('Vacant')) return 'V';
+  return '';
+}
+
+// Apply effective statuses to EVERY Status column
+function applyStatusesToSheet(){
+  if (!sheetState.rows) return;
+  ensureStatusColumns(sheetState.rows, sheetState.pairs, sheetState.hasHeader);
+
+  const start = sheetState.hasHeader ? 1 : 0;
+  for (let r = start; r < sheetState.rows.length; r++){
+    for (const p of sheetState.pairs){
+      const unit = parseUnitNumber(sheetState.rows[r][p.unitCol]);
+      if (!Number.isFinite(unit)) continue;
+      ensureUnitRecord(state.dateISO, unit);
+      const statuses = effectiveStatusesForUnit(unit);
+      sheetState.rows[r][p.statusCol] = statusesToSheetMark(statuses);
+    }
+  }
+  renderSheet();
+  const st = $('#sheetStatus'); if (st) st.textContent = 'Statuses applied.';
+}
+
+// Render sheet with highlights
+function renderSheet(){
+  const host = $('#sheetHost');
+  if (!host) return;
+  host.innerHTML = '';
+  if (!sheetState.rows) return;
+
+  const table = document.createElement('table');
+  const thead = document.createElement('thead');
+  const tbody = document.createElement('tbody');
+
+  sheetState.rows.forEach((row, ri)=>{
+    const tr = document.createElement('tr');
+    row.forEach((cell, ci)=>{
+      const el = (sheetState.hasHeader && ri===0) ? document.createElement('th') : document.createElement('td');
+      if (sheetState.pairs.some(p=>p.unitCol===ci))   el.style.background = '#f6fbff'; // units
+      if (sheetState.pairs.some(p=>p.statusCol===ci)) el.style.background = '#f9fff6'; // statuses
+      el.textContent = (cell == null ? '' : String(cell));
+      tr.appendChild(el);
+    });
+    if (sheetState.hasHeader && ri===0) thead.appendChild(tr); else tbody.appendChild(tr);
+  });
+
+  if (thead.children.length) table.appendChild(thead);
+  table.appendChild(tbody);
+  host.appendChild(table);
+
+  const meta = $('#sheetMeta');
+  if (meta){
+    meta.textContent = `${sheetState.name||'Sheet'} — ${sheetState.rows.length} rows; pairs: ` +
+      sheetState.pairs.map(p=>`[${p.unitCol+1}/${p.statusCol+1}]`).join(', ');
+  }
+}
+
+function saveSheetXLSX(){
+  if (!sheetState.rows) return;
+  const ws = XLSX.utils.aoa_to_sheet(sheetState.rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetState.name || 'Report');
+  const fname = `report_${state.dateISO}.xlsx`;
+  XLSX.writeFile(wb, fname);
+}
+
+function printSheet(){
+  if (!sheetState.rows){ alert('Load a blueprint first.'); return; }
+  $('#sheetWrap').style.display = '';
+  window.print();
+}
+
+// Compact contiguous units into ranges
+function compactUnitsToRanges(units){
+  const u = [...new Set(units)].map(Number).filter(Number.isFinite).sort((a,b)=>a-b);
+  const out = []; let s=null, prev=null;
+  for (const n of u){
+    if (s===null){ s=n; prev=n; continue; }
+    if (n === prev+1){ prev=n; continue; }
+    out.push({start:s, end:prev}); s=n; prev=n;
+  }
+  if (s!==null) out.push({start:s, end:prev});
+  return out;
+}
+
+// Simple CSV parser (quote-aware)
+function parseCSV(text){
+  const rows = []; let i=0, field='', row=[], q=false;
+  const pushField = ()=>{ row.push(field); field=''; };
+  const pushRow = ()=>{ rows.push(row); row=[]; };
+  while(i<text.length){
+    const c = text[i];
+    if (q){
+      if (c === '"'){
+        if (text[i+1] === '"'){ field+='"'; i++; }
+        else { q=false; }
+      } else field += c;
+    } else {
+      if (c === '"') q=true;
+      else if (c === ',') pushField();
+      else if (c === '\n'){ pushField(); pushRow(); }
+      else if (c === '\r'){ /* skip */ }
+      else field += c;
+    }
+    i++;
+  }
+  pushField(); pushRow();
+  while (rows.length && rows[rows.length-1].every(v=>String(v||'').trim()==='')) rows.pop();
+  return rows;
+}
+
+// Import .xlsx/.csv blueprint, render, and optionally update carousel ranges
+function importBlueprintFile(file, includeUnits){
+  const name = (file?.name||'').toLowerCase();
+  const finish = (rows, sheetName) => {
+    rows = (rows||[]).map(r => Array.isArray(r) ? r : Array.from(r));
+    while (rows.length && rows[rows.length-1].every(c => String(c??'').trim()==='')) rows.pop();
+
+    const det = detectPairs(rows);
+    sheetState.rows = rows;
+    sheetState.hasHeader = det.hasHeader;
+    sheetState.pairs = det.pairs;
+    sheetState.name = sheetName || 'Sheet';
+
+    ensureStatusColumns(sheetState.rows, sheetState.pairs, sheetState.hasHeader);
+
+    if (includeUnits){
+      const start = sheetState.hasHeader ? 1 : 0;
+      const units = [];
+      for (let r=start; r<rows.length; r++){
+        for (const p of sheetState.pairs){
+          const n = parseUnitNumber(rows[r][p.unitCol]);
+          if (Number.isFinite(n)) units.push(n);
+        }
+      }
+      if (units.length){
+        const newRanges = compactUnitsToRanges(units);
+        setRanges(newRanges);
+        rebuildUnits();
+        buildCarousel();
+        if (getVisibleUnits().length>0) loadUnit(currentUnit());
+      }
+    }
+
+    renderSheet();
+    $('#sheetWrap').style.display = '';
+    $('#sheetStatus').textContent = `Loaded: ${file.name}`;
+    $('#btnApplyStatusesSheet').disabled = false;
+    $('#btnSaveSheet').disabled = false;
+    $('#btnPrintSheet').disabled = false;
+  };
+
+  if (name.endsWith('.csv')){
+    const reader = new FileReader();
+    reader.onload = () => { finish(parseCSV(reader.result), 'CSV'); };
+    reader.readAsText(file);
+    return;
+  }
+
+  // XLSX/XLS
+  if (!window.XLSX){ alert('XLSX library not loaded.'); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const wb = XLSX.read(reader.result, {type:'array'});
+    const sn = wb.SheetNames[0];
+    const ws = wb.Sheets[sn];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+    finish(rows, sn);
+  };
+  reader.readAsArrayBuffer(file);
+}
+/* ========= end Spreadsheet integration ========= */
 
 // Boot
 document.addEventListener('DOMContentLoaded', init);
