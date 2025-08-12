@@ -39,42 +39,86 @@
     return `${mm}/${dd}/${yy} ${dt.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
   }
 
-  // Ensure a status row exists just above the carousel
+  // ----- Status row placement (just above the carousel) -----
   function ensureStatusRow() {
     let row = $('#syncStatusRow');
-    if (row) return row;
-    row = document.createElement('div');
-    row.id = 'syncStatusRow';
-    row.className = 'sync-row';
-    row.setAttribute('aria-live', 'polite');
+    if (!row) {
+      row = document.createElement('div');
+      row.id = 'syncStatusRow';
+      row.className = 'sync-row';
+      row.setAttribute('aria-live', 'polite');
+      document.body.appendChild(row); // temporary; place correctly below
+    }
+    placeRowBeforeCarousel(row);
+    return row;
+  }
+  function placeRowBeforeCarousel(row) {
     const carousel = $('#carousel');
     if (carousel && carousel.parentNode) {
-      carousel.parentNode.insertBefore(row, carousel);
+      if (row.nextSibling !== carousel) carousel.parentNode.insertBefore(row, carousel);
     } else {
       const header = document.querySelector('header');
-      if (header && header.parentNode) header.parentNode.insertBefore(row, header.nextSibling);
-      else document.body.insertBefore(row, document.body.firstChild);
+      if (header && header.parentNode && row.previousSibling !== header) {
+        header.parentNode.insertBefore(row, header.nextSibling);
+      }
     }
-    return row;
+  }
+  function watchForCarousel(row) {
+    let ticks = 0;
+    const mo = new MutationObserver(() => placeRowBeforeCarousel(row));
+    mo.observe(document.body, { childList: true, subtree: true });
+    const iv = setInterval(() => {
+      ticks++; placeRowBeforeCarousel(row);
+      if ($('#carousel') || ticks > 40) { clearInterval(iv); mo.disconnect(); }
+    }, 50);
   }
 
   function setStatusState(state){
     const row = ensureStatusRow();
     row.classList.remove('syncing','success','error');
     if (state) row.classList.add(state);
-    // Auto-fade success/error back to idle gray
-    if (state === 'success' || state === 'error') {
-      setTimeout(()=> row.classList.remove(state), 1500);
-    }
+    if (state === 'success' || state === 'error') setTimeout(()=> row.classList.remove(state), 1500);
   }
 
   function updateStatus(){
     const s = window.CloudSync?.getStatus?.();
-    const el = ensureStatusRow();
-    if (el && s) el.textContent = `Last synced: ${fmt(s.lastSync)} • Pending: ${s.pending}`;
+    const row = ensureStatusRow();
+    if (row && s) row.textContent = `Last synced: ${fmt(s.lastSync)} • Pending: ${s.pending}`;
   }
 
-  // Debounced auto-sync on changes
+  // ----- UI refresh hook (U2) -----
+  function refreshAfterSync() {
+    // Preserve the current unit if we can
+    const prevUnit = (typeof window.currentUnit === 'function') ? window.currentUnit() : null;
+
+    // If the visible set could have changed (e.g., overlocked filter), rebuild the carousel
+    if (typeof window.buildCarousel === 'function') window.buildCarousel();
+
+    // Try to keep selection and refresh details
+    if (typeof window.getVisibleUnits === 'function' && typeof window.loadUnit === 'function') {
+      const vis = window.getVisibleUnits();
+      if (prevUnit != null && vis.includes(prevUnit)) {
+        if (window.state && typeof window.state.idx === 'number') {
+          window.state.idx = vis.indexOf(prevUnit);
+        }
+        window.loadUnit(prevUnit);
+      } else if (vis.length) {
+        if (window.state && typeof window.state.idx === 'number') window.state.idx = 0;
+        window.loadUnit(vis[0]);
+      }
+    } else if (prevUnit != null && typeof window.loadUnit === 'function') {
+      window.loadUnit(prevUnit);
+    }
+
+    // Refresh badges, highlights, report, and timestamps
+    if (typeof window.reflectCarouselBadges === 'function') window.reflectCarouselBadges();
+    if (typeof window.highlightActivePill === 'function') window.highlightActivePill();
+    if (typeof window.centerActive === 'function') window.centerActive();
+    if (typeof window.updateReport === 'function') window.updateReport();
+    if (typeof window.updateLastUpdatedLabel === 'function') window.updateLastUpdatedLabel();
+  }
+
+  // ----- Debounced auto-sync on changes -----
   let syncTimer = null;
   let lastSyncAt = 0;
   const DEBOUNCE_MS = 5000;       // wait 5s after last change
@@ -85,6 +129,8 @@
     setStatusState('syncing');
     try {
       await window.CloudSync.syncNow();
+      // Immediately refresh UI from local storage (now merged with remote)
+      refreshAfterSync();
       updateStatus();
       setStatusState('success');
       lastSyncAt = Date.now();
@@ -102,21 +148,23 @@
     syncTimer = setTimeout(runSync, Math.max(0, wait));
   }
 
-  // Listen for explicit app saves (emitted from app.js)
+  // Listen for explicit app saves (from app.js)
   window.addEventListener('sst:changed', scheduleSync);
-  // Flush soon after app returns to foreground
+  // Schedule one when returning to foreground
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) scheduleSync();
   });
 
-  // UI mount + “Sync on Report”
+  // ----- UI mount + “Sync on Report” -----
   function mountUI() {
     const bar = document.querySelector('header .toolbar') || document.querySelector('header');
     if (!bar) return;
 
-    const old = $('#syncStatus'); // remove any legacy inline status
+    // Remove any legacy inline status
+    const old = $('#syncStatus');
     if (old) old.remove();
 
+    // Sync button
     if (!$('#btnCloudSync')) {
       const btn = document.createElement('button');
       btn.id = 'btnCloudSync';
@@ -129,14 +177,15 @@
       bar.appendChild(btn);
     }
 
-    // Sync (non-blocking) when Report is opened
+    // Sync when Report is opened (non-blocking)
     const reportBtn = $('#btnReport');
     if (reportBtn && !reportBtn.dataset.cloudSyncHook) {
       reportBtn.dataset.cloudSyncHook = '1';
       reportBtn.addEventListener('click', () => { scheduleSync(); });
     }
 
-    ensureStatusRow();
+    const row = ensureStatusRow();
+    watchForCarousel(row);  // make sure it ends up right above the carousel
     updateStatus();
   }
 
@@ -145,6 +194,7 @@
     setStatusState('syncing');
     try {
       await window.CloudSync.syncNow();
+      refreshAfterSync();   // ensure UI matches freshly pulled data
       updateStatus();
       setStatusState('success');
       lastSyncAt = Date.now();
