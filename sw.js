@@ -1,4 +1,4 @@
-const CACHE = 'sst-cache-v1';
+const CACHE = 'sst-cache-v2';
 
 self.addEventListener('install', (e)=>{
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll([
@@ -43,3 +43,4 @@ self.addEventListener('fetch', (e)=>{
     }
   })());
 });
+
