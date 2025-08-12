@@ -19,7 +19,7 @@ const LS = {
   META: 'sst_unit_meta_v1',
   FORWARD: 'sst_forward_v1',
   STATUS_FWD: 'sst_status_forward_v1',
-  DATE_DATA_PREFIX: 'sst_date_',
+  DATE_DATA_PREFIX: 'sst_date_'
 };
 
 const getRanges = () => JSON.parse(localStorage.getItem(LS.RANGES) || '[]');
@@ -34,15 +34,16 @@ const dateKey = (iso) => LS.DATE_DATA_PREFIX + iso;
 const getDateData = (iso) => JSON.parse(localStorage.getItem(dateKey(iso)) || '{}');
 const setDateData = (iso, data) => localStorage.setItem(dateKey(iso), JSON.stringify(data));
 
-// Units from ranges
+// Build units list from ranges
 const unitsFromRanges = (ranges) => {
-  const out = [];
+  const arr = [];
   for (const r of ranges){
     const s = Number(r.start), e = Number(r.end);
-    if (!Number.isFinite(s) || !Number.isFinite(e) || e < s) continue;
-    for (let n=s; n<=e; n++) out.push(n);
+    if (!Number.isFinite(s) || !Number.isFinite(e)) continue;
+    if (e < s) continue;
+    for (let n=s; n<=e; n++) arr.push(n);
   }
-  return out;
+  return arr;
 };
 
 // Status helpers
@@ -54,6 +55,7 @@ const statusPriority = (set) => {
   return 'Vacant';
 };
 
+// Effective statuses (current date or forward fallback)
 function effectiveStatusesForUnit(n){
   const data = getDateData(state.dateISO);
   const rec = data[n] || {};
@@ -72,22 +74,26 @@ const state = {
 };
 
 /****************
- * Init
- ****************/
+ * Initialization *
+ ***************/
 function init(){
   if (getRanges().length === 0) setRanges([{start:1,end:80}]);
 
-  const dp = $('#datePicker'); if (dp) dp.value = state.dateISO;
+  const dp = $('#datePicker');
+  if (dp) dp.value = state.dateISO;
 
   rebuildUnits();
   buildCarousel();
   wireStatusLegend();
 
-  const vis = getVisibleUnits();
-  if (vis.length) loadUnit(currentUnit());
+  if (getVisibleUnits().length>0){
+    loadUnit(currentUnit());
+  }else{
+    const h = $('#history'); if (h) h.textContent = 'No history yet.';
+  }
+
   updateReport();
   updateLastUpdatedLabel();
-
   bindInputs();
   setupPWA();
 }
@@ -98,7 +104,7 @@ function rebuildUnits(){
 }
 
 /*********************
- * Edit flush
+ * Edit Flush Utility *
  *********************/
 function flushCurrentEdits(){
   clearTimeout(commentTimer);
@@ -115,8 +121,8 @@ function flushCurrentEdits(){
 }
 
 /****************
- * Carousel
- ****************/
+ * Carousel UI   *
+ ***************/
 function getVisibleUnits(){
   const base = state.units || [];
   if (!state.overlockedOnly) return base;
@@ -125,6 +131,7 @@ function getVisibleUnits(){
 
 function buildCarousel(){
   const car = $('#carousel');
+  if (!car) return;
   const arr = getVisibleUnits();
   car.innerHTML = '';
   if (arr.length === 0){
@@ -175,6 +182,7 @@ function highlightActivePill(){
 
 function centerActive(){
   const car = $('#carousel');
+  if (!car) return;
   const n = currentUnit();
   const pill = car.querySelector(`.unit-pill[data-unit="${n}"]`);
   if (pill){ pill.scrollIntoView({block:'nearest', inline:'center'}); }
@@ -204,8 +212,8 @@ function prevUnit(){
 }
 
 /****************
- * Data binding
- ****************/
+ * Data Binding  *
+ ***************/
 function ensureUnitRecord(iso, unit){
   const data = getDateData(iso);
   if (!data[unit]){
@@ -223,10 +231,10 @@ function loadUnit(unit){
   const data = getDateData(state.dateISO)[unit];
   const statuses = new Set(data.statuses||[]);
 
-  // Status buttons
+  // Reflect status buttons
   $$('.status-btn').forEach(btn=> { btn.dataset.active = statuses.has(btn.dataset.key); });
 
-  // Comment + contact (show forward as placeholders if blank)
+  // Comment + contact (use forward as placeholder)
   const forward = getForward()[unit] || {};
   $('#comment').value = data.comment ?? '';
   $('#comment').placeholder = forward.comment ? `(from previous) ${forward.comment}` : 'Comment (persists forward to future dates)';
@@ -234,11 +242,11 @@ function loadUnit(unit){
   $('#contactPhone').value = data.phone ?? forward.phone ?? '';
   $('#contactNote').value = data.note ?? forward.note ?? '';
 
-  // Mini
-  $('#miniNum')?.textContent = unit;
-  $('#miniMulti')?.toggleAttribute('hidden', !((data.statuses||[]).length > 1));
-  $('#miniNote')?.toggleAttribute('hidden', !((data.comment||forward.comment||'').trim().length>0));
-  $('#miniDot')?.toggleAttribute('hidden', !wasModifiedToday(data.lastModified));
+  // Mini box
+  $('#miniNum').textContent = unit;
+  $('#miniMulti').hidden = !((data.statuses||[]).length > 1);
+  $('#miniNote').hidden = !((data.comment||forward.comment||'').trim().length>0);
+  $('#miniDot').hidden = !wasModifiedToday(data.lastModified);
 
   renderHistoryPreview(data.history||[]);
   reflectCarouselBadges();
@@ -265,12 +273,12 @@ function saveUnitChange(unit, updater){
     all[unit] = rec;
     setDateData(iso, all);
 
-    // persist-forward statuses + fields
+    // persist-forward statuses
     const sf = getStatusForward();
     sf[unit] = [...new Set(rec.statuses||[])];
     setStatusForward(sf);
-    updateForwardFrom(rec, unit);
 
+    updateForwardFrom(rec, unit);
     updateLastUpdatedLabel();
   }
 }
@@ -296,8 +304,24 @@ function updateLastUpdatedLabel(){
 }
 
 /****************
- * Inputs
- ****************/
+ * Status / Inputs
+ ***************/
+function onToggleStatus(key){
+  const unit = currentUnit();
+  saveUnitChange(unit, rec => {
+    const set = new Set(rec.statuses||[]);
+    if (set.has(key)) set.delete(key); else set.add(key);
+    rec.statuses = [...set];
+  });
+  loadUnit(unit);
+  if (state.overlockedOnly){
+    const vis = getVisibleUnits();
+    if (!vis.includes(unit)) state.idx = Math.min(state.idx, Math.max(0, vis.length-1));
+    buildCarousel();
+  }
+  updateReport();
+}
+
 let commentTimer;
 function bindInputs(){
   // statuses
@@ -307,28 +331,25 @@ function bindInputs(){
 
   // comment (debounce + blur)
   const cmt = $('#comment');
-  if (cmt){
-    cmt.addEventListener('input', ()=>{
-      clearTimeout(commentTimer);
-      commentTimer = setTimeout(()=>{
-        const unit = currentUnit(); if (unit==null) return;
-        saveUnitChange(unit, rec => { rec.comment = $('#comment').value; });
-        reflectCarouselBadges(); updateReport();
-        if (state.overlockedOnly) buildCarousel();
-      }, 800);
-    });
-    cmt.addEventListener('blur', ()=>{
+  cmt.addEventListener('input', ()=>{
+    clearTimeout(commentTimer);
+    commentTimer = setTimeout(()=>{
       const unit = currentUnit(); if (unit==null) return;
       saveUnitChange(unit, rec => { rec.comment = $('#comment').value; });
       reflectCarouselBadges(); updateReport();
       if (state.overlockedOnly) buildCarousel();
-    });
-  }
+    }, 800);
+  });
+  cmt.addEventListener('blur', ()=>{
+    const unit = currentUnit(); if (unit==null) return;
+    saveUnitChange(unit, rec => { rec.comment = $('#comment').value; });
+    reflectCarouselBadges(); updateReport();
+    if (state.overlockedOnly) buildCarousel();
+  });
 
   // contacts
   ['contactName','contactPhone','contactNote'].forEach(id=>{
     const el = $('#'+id);
-    if (!el) return;
     el.addEventListener('blur', ()=>{
       const unit = currentUnit(); if (unit==null) return;
       saveUnitChange(unit, rec => {
@@ -340,12 +361,16 @@ function bindInputs(){
     });
   });
 
+  // meta (wired but optional)
+  $$('.meta-size').forEach(ch=> ch.addEventListener('change', saveMeta));
+  $$('.meta-type').forEach(ch=> ch.addEventListener('change', saveMeta));
+
   // nav
-  $('#btnNext')?.addEventListener('click', nextUnit);
-  $('#btnPrev')?.addEventListener('click', prevUnit);
+  $('#btnNext').addEventListener('click', nextUnit);
+  $('#btnPrev').addEventListener('click', prevUnit);
 
   // date
-  $('#datePicker')?.addEventListener('change', ()=>{
+  $('#datePicker').addEventListener('change', ()=>{
     flushCurrentEdits();
     state.dateISO = $('#datePicker').value || todayISO();
     buildCarousel();
@@ -354,18 +379,18 @@ function bindInputs(){
       if (state.idx >= vis.length) state.idx = 0;
       loadUnit(currentUnit());
     } else {
-      $('#history').textContent = 'No history yet.';
-      $('#miniNum').textContent = '—';
-      $('#miniMulti').setAttribute('hidden','');
-      $('#miniNote').setAttribute('hidden','');
-      $('#miniDot').setAttribute('hidden','');
+      const h = $('#history'); if (h) h.textContent = 'No history yet.';
+      const mn = $('#miniNum'); if (mn) mn.textContent = '—';
+      $('#miniMulti')?.setAttribute('hidden','');
+      $('#miniNote')?.setAttribute('hidden','');
+      $('#miniDot')?.setAttribute('hidden','');
     }
     updateReport();
     updateLastUpdatedLabel();
   });
 
   // report toggle
-  $('#btnReport')?.addEventListener('click', ()=>{
+  $('#btnReport').addEventListener('click', ()=>{
     const page = $('#reportPage'); if (!page) return;
     page.toggleAttribute('active');
     if (page.hasAttribute('active')){ updateReport(); page.scrollIntoView({behavior:'smooth'}); }
@@ -380,44 +405,18 @@ function bindInputs(){
   });
 
   // ranges
-  $('#btnRanges')?.addEventListener('click', openRanges);
+  $('#btnRanges').addEventListener('click', openRanges);
   $$('#rangesDrawer [data-close]').forEach(el=> el.addEventListener('click', closeRanges));
-  // Also close on ESC anywhere:
-  document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') closeRanges(); });
-
-  $('#addRange')?.addEventListener('click', addRangeRow);
-  $('#clearAllData')?.addEventListener('click', ()=>{
+  $('#addRange').addEventListener('click', addRangeRow);
+  $('#clearAllData').addEventListener('click', ()=>{
     if (confirm('This will remove ALL saved data, ranges, meta, and forward fields. Continue?')){
       localStorage.clear(); location.reload();
     }
   });
 
-  // history helpers
-  $('#btnViewHistory')?.addEventListener('click', ()=>{
-    const unit = currentUnit(); if (unit==null) return;
-    const rec = ensureUnitRecord(state.dateISO, unit);
-    const lines = (rec.history||[]).map(h=>{
-      const st = (h.data?.statuses||[]).join(', ') || '—';
-      const cm = (h.data?.comment||'').trim();
-      return `${fmtUS(h.t)} — [${st}]${cm?` — ${cm}`:''}`;
-    });
-    alert(lines.length
-      ? `History for unit ${unit}\n\n• ${lines.join('\n• ')}`
-      : 'No history yet.');
-  });
-
-  $('#btnClearCommentFuture')?.addEventListener('click', ()=>{
-    const unit = currentUnit(); if (unit==null) return;
-    const fwd = getForward();
-    if (fwd[unit]){ fwd[unit].comment = ''; setForward(fwd); }
-    const rec = ensureUnitRecord(state.dateISO, unit);
-    if (!rec.comment){ const c = $('#comment'); if (c) c.placeholder = 'Comment (persists forward to future dates)'; }
-    reflectCarouselBadges(); updateReport();
-  });
-
   // overlocked filter
   const filtBtn = $('#toggleOverlockedFilter');
-  filtBtn?.addEventListener('click', ()=>{
+  filtBtn.addEventListener('click', ()=>{
     flushCurrentEdits();
     const curr = currentUnit();
     state.overlockedOnly = !state.overlockedOnly;
@@ -430,19 +429,52 @@ function bindInputs(){
       if (state.idx < 0) state.idx = 0;
       loadUnit(currentUnit());
     } else {
-      $('#history').textContent = 'No history yet.';
-      $('#miniNum').textContent = '—';
-      $('#miniMulti').setAttribute('hidden','');
-      $('#miniNote').setAttribute('hidden','');
-      $('#miniDot').setAttribute('hidden','');
+      const h = $('#history'); if (h) h.textContent = 'No history yet.';
+      const mn = $('#miniNum'); if (mn) mn.textContent = '—';
+      $('#miniMulti')?.setAttribute('hidden','');
+      $('#miniNote')?.setAttribute('hidden','');
+      $('#miniDot')?.setAttribute('hidden','');
     }
     highlightActivePill();
     centerActive();
   });
+
+  // history
+  $('#btnViewHistory').addEventListener('click', ()=>{
+    const unit = currentUnit(); if (unit==null) return;
+    const rec = ensureUnitRecord(state.dateISO, unit);
+    const lines = (rec.history||[]).map(h=>{
+      const st = (h.data?.statuses||[]).join(', ') || '—';
+      const cm = (h.data?.comment||'').trim();
+      return `${fmtUS(h.t)} — [${st}]${cm?` — ${cm}`:''}`;
+    });
+    alert(lines.length
+      ? `History for unit ${unit}\n\n• ${lines.join('\n• ')}`
+      : 'No history yet.');
+  });
+
+  $('#btnClearCommentFuture').addEventListener('click', ()=>{
+    const unit = currentUnit(); if (unit==null) return;
+    const fwd = getForward();
+    if (fwd[unit]){ fwd[unit].comment = ''; setForward(fwd); }
+    const rec = ensureUnitRecord(state.dateISO, unit);
+    if (!rec.comment){ const c = $('#comment'); if (c) c.placeholder = 'Comment (persists forward to future dates)'; }
+    reflectCarouselBadges(); updateReport();
+  });
+}
+
+function saveMeta(){
+  const unit = currentUnit();
+  const meta = getMeta();
+  meta[unit] = {
+    sizes: $$('.meta-size').filter(x=>x.checked).map(x=>x.value),
+    types: $$('.meta-type').filter(x=>x.checked).map(x=>x.value),
+  };
+  setMeta(meta);
 }
 
 /***********
- * Report
+ * Report (fallback table)
  **********/
 function updateReport(){
   const tbody = $('#reportTable tbody');
@@ -488,6 +520,7 @@ function updateReport(){
 
 function wireStatusLegend(){
   const legend = $('#statusLegend');
+  if (!legend) return;
   legend.innerHTML = '';
   const items = [ ['Locked','ok'], ['Vacant','vacant'], ['Overlocked','overlocked'], ['Issue','issue'] ];
   for (const [label, key] of items){
@@ -503,14 +536,13 @@ function wireStatusLegend(){
 }
 
 /****************
- * Ranges Drawer
- ****************/
-function openRanges(){ renderRangeList(); $('#rangesDrawer')?.setAttribute('open',''); }
-function closeRanges(){ $('#rangesDrawer')?.removeAttribute('open'); }
+ * Ranges Drawer *
+ ***************/
+function openRanges(){ renderRangeList(); $('#rangesDrawer').setAttribute('open',''); }
+function closeRanges(){ $('#rangesDrawer').removeAttribute('open'); }
 
 function renderRangeList(){
   const list = $('#rangeList');
-  if (!list) return;
   list.innerHTML = '';
   const ranges = getRanges();
   ranges.forEach((r, idx)=>{
@@ -535,7 +567,6 @@ function renderRangeList(){
 
 function saveRanges(){
   const list = $('#rangeList');
-  if (!list) return;
   const rows = Array.from(list.children);
   const ranges = rows.map(r=>({ start:Number(r.children[0].value||0), end:Number(r.children[1].value||0) }))
                      .filter(x=>Number.isFinite(x.start) && Number.isFinite(x.end));
@@ -560,11 +591,11 @@ function addRangeRow(){
 }
 
 /****************
- * PWA
- ****************/
+ * PWA: SW + Manifest
+ ***************/
 function setupPWA(){
   if ('serviceWorker' in navigator){
-    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
   }
 }
 
